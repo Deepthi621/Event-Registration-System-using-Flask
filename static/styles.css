@@ -1,0 +1,72 @@
+body {
+    font-family: 'Fredoka', sans-serif;
+    background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%);
+  }
+
+  .navbar {
+    background-color: #ff6f61;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  }
+
+  .navbar-brand {
+    font-size: 1.6rem;
+    font-weight: bold;
+    color: #fff !important;
+    letter-spacing: 1px;
+  }
+
+  h2 {
+    color: #ff6f61;
+    font-weight: 600;
+  }
+
+  .btn-light-red {
+    background-color: #f8d7da; /* Light red */
+    border: none;
+    color: #721c24;
+    font-weight: bold;
+    border-radius: 5px;
+    padding: 10px 16px;
+    box-shadow: 0 4px 10px rgba(248, 215, 218, 0.5);
+  }
+
+  .btn-light-red:hover {
+    background-color: #f5c6cb; /* Darker light red */
+    color: #721c24;
+  }
+
+  .btn-registered {
+    background-color: #28a745 !important; /* Green */
+    color: #fff !important;
+    font-weight: 600;
+    border-radius: 5px;
+    padding: 10px 16px;
+    border: none;
+    box-shadow: 0 4px 10px rgba(40, 167, 69, 0.2);
+    cursor: default;
+  }
+
+  .btn-registered:disabled {
+    opacity: 1;
+    background-color: #28a745 !important;
+    color: #fff;
+  }
+
+  .btn-blue {
+    background-color: #007bff !important; /* Blue */
+    color: white !important;
+    font-weight: 600;
+    border-radius: 5px;
+    padding: 10px 16px;
+    border: none;
+    box-shadow: 0 4px 10px rgba(0, 123, 255, 0.2);
+  }
+
+  .btn-blue:hover, .btn-blue:focus {
+    background-color: #0056b3 !important; /* Darker Blue */
+    box-shadow: 0 6px 15px rgba(0, 123, 255, 0.2);
+    transform: translateY(-3px);
+  }
+
+  /* ----------- */
+ 

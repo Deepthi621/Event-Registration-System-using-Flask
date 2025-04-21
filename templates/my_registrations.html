@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>My Registrations</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body {
+      font-family: 'Fredoka', sans-serif;
+      background: linear-gradient(to right, #fff9f9, #ffe3e3);
+      min-height: 100vh;
+    }
+    .navbar {
+      background-color: #ff6f61;
+    }
+    .navbar-brand {
+      font-weight: 600;
+      font-size: 1.6rem;
+      color: #fff !important;
+    }
+    .btn-danger {
+      background-color: #dc3545;
+      border: none;
+    }
+    .card {
+      border: none;
+      border-radius: 1rem;
+      transition: transform 0.3s;
+      border-left: 4px solid #ff6f61;
+    }
+    .card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 8px 20px rgba(255, 111, 97, 0.2);
+    }
+    .card-title {
+      color: #ff6f61;
+      font-weight: 600;
+    }
+    .badge {
+      font-size: 0.9rem;
+      padding: 0.5em 0.7em;
+      border-radius: 0.5rem;
+    }
+    .alert {
+      border-radius: 1rem;
+    }
+    footer {
+      text-align: center;
+      padding: 1rem;
+      color: #888;
+    }
+    .btn-feedback {
+      background-color: #ff6f61;
+      border: none;
+    }
+    .btn-feedback:hover {
+      background-color: #e85a4f;
+    }
+    .event-date {
+      position: relative;
+      padding-left: 1.5rem;
+    }
+    .event-date::before {
+      content: "\f073";
+      font-family: "Font Awesome 6 Free";
+      font-weight: 900;
+      position: absolute;
+      left: 0;
+      color: #ff6f61;
+    }
+    .event-time {
+    position: relative;
+    padding-left: 1.5rem;
+    color: #666;
+}
+
+.event-time::before {
+    content: "\f017";
+    font-family: "Font Awesome 6 Free";
+    font-weight: 900;
+    position: absolute;
+    left: 0;
+    color: #ff6f61;
+}
+  </style>
+</head>
+<body>
+  <nav class="navbar navbar-expand-lg mb-4">
+    <div class="container d-flex justify-content-between">
+        <span class="navbar-brand">
+            <i class="fas fa-calendar-check me-2 text-white fa-lg"></i>
+            My Event Registrations
+        </span>
+        <div>
+            <a href="/dashboard" class="btn btn-light me-2">
+                <i class="fas fa-home"></i> Dashboard
+            </a>
+            <a href="/logout" class="btn btn-danger">Logout</a>
+        </div>
+    </div>
+</nav>
+
+  <div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    {% if registrations %}
+      <div class="row">
+        {% for reg in registrations %}
+        <div class="col-md-6 col-lg-4 mb-4">
+          <div class="card h-100 shadow-sm">
+            <div class="card-body">
+              <h5 class="card-title">{{ reg.EventName }}</h5>
+<!-- Replace the existing date line with this -->
+<p class="event-date mb-2">
+  {{ reg.EventDate.strftime('%b %d, %Y') }}
+</p>
+<p class="event-time mb-2">
+  <i class="fas fa-clock me-2"></i>
+  {{ reg.StartTime }} - {{ reg.EndTime }}
+</p>              
+              <div class="d-flex justify-content-between mb-2">
+                <span class="badge bg-{% if reg.registration_status == 'Active' %}success{% else %}secondary{% endif %}">
+                  {{ reg.registration_status }}
+                </span>
+                <span class="badge bg-{% if reg.payment_status == 'Completed' %}success{% elif reg.payment_status == 'Pending' %}warning text-dark{% else %}secondary{% endif %}">
+                  Payment: {{ reg.payment_status }}
+                </span>
+              </div>
+
+              {% if reg.payment_status == 'Pending' %}
+                <a href="/complete-payment/{{ reg.PaymentID }}" class="btn btn-success w-100 mb-2">
+                  <i class="fas fa-credit-card me-2"></i>Complete Payment
+                </a>
+              {% endif %}
+
+              {% if reg.registration_status == 'Active' %}
+    {% if reg.allow_feedback %}
+        <a href="/submit-feedback/{{ reg.EventID }}" class="btn btn-feedback w-100">
+            <i class="fas fa-comment me-2"></i>
+            {% if reg.has_given_feedback %}Update Feedback{% else %}Submit Feedback{% endif %}
+        </a>
+    {% else %}
+        {% if reg.EventDate > current_date %}
+            <button class="btn btn-secondary w-100" disabled 
+                    title="Feedback available after event completion">
+                <i class="fas fa-clock me-2"></i>Feedback not available yet
+            </button>
+        {% else %}
+            <button class="btn btn-secondary w-100" disabled 
+                    title="Feedback window expired (48 hours after event)">
+                <i class="fas fa-hourglass-end me-2"></i>Feedback closed
+            </button>
+        {% endif %}
+    {% endif %}
+{% endif %}
+<!-- In the card body section -->
+{% if reg.registration_status == 'Active' %}
+    {% if reg.EventDate > current_date %}
+        <!-- Cancel Button for Future Events -->
+        <button class="btn btn-outline-danger w-100 mb-2" 
+                data-bs-toggle="modal" 
+                data-bs-target="#cancelModal{{ reg.RegistrationID }}">
+            <i class="fas fa-times-circle me-2"></i>Cancel Registration
+        </button>
+    {% else %}
+        <!-- Attendance Confirmation for Past Events -->
+        <button class="btn btn-success w-100 mb-2" disabled>
+            <i class="fas fa-check-circle me-2"></i>Thanks for attending!
+        </button>
+    {% endif %}
+{% endif %}
+            </div>
+          </div>
+        </div>
+
+        <!-- Cancellation Modal -->
+        <div class="modal fade" id="cancelModal{{ reg.RegistrationID }}" tabindex="-1" aria-hidden="true">
+          <div class="modal-dialog">
+            <div class="modal-content">
+              <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">Cancel Registration</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <form action="/cancel-registration/{{ reg.RegistrationID }}" method="POST">
+                <div class="modal-body">
+                  <p>You are about to cancel your registration for <strong>{{ reg.EventName }}</strong>.</p>
+                  <div class="mb-3">
+                    <label class="form-label">Reason for cancellation:</label>
+                    <textarea class="form-control" name="cancellation_reason" required></textarea>
+                  </div>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                  <button type="submit" class="btn btn-danger">Confirm Cancellation</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="alert alert-info text-center">
+        <i class="fas fa-calendar-times me-2"></i>You have not registered for any events yet.
+      </div>
+    {% endif %}
+  </div>
+
+  <footer class="mt-4">
+    &copy; 2025 Event Registration System | Made with <i class="fas fa-heart" style="color: #ff6f61;"></i>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    // Add tooltips for disabled buttons
+    document.addEventListener('DOMContentLoaded', function() {
+        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[title]'))
+        tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl)
+        })
+    })
+    </script>
+</body>
+</html>
