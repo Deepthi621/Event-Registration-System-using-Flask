@@ -209,6 +209,7 @@ def event_reports():
 
     try:
         with conn.cursor(dictionary=True) as cursor:
+            # Fetch reports first
             cursor.execute("""
                 SELECT 
                     r.ReportID,
@@ -226,10 +227,12 @@ def event_reports():
             """, (session['user_id'],))
             reports = cursor.fetchall()
 
-            # Process photos
+            # Process reports
             for report in reports:
+                report['Content'] = report['Content'].replace('\n', '<br>')
                 report['photos'] = report['photos'].split(',') if report['photos'] else []
 
+            # Fetch past events
             cursor.execute("""
                 SELECT EventID, EventName, Date 
                 FROM Events 
@@ -238,15 +241,38 @@ def event_reports():
             """, (session['user_id'],))
             past_events = cursor.fetchall()
 
-        return render_template('event_report.html',
-                            reports=reports,
-                            past_events=past_events)
+            # Create template
+            report_template = """📋 EVENT REPORT TEMPLATE
+
+Event Name: [Enter event name]
+Date: [Enter date]
+Venue: [Enter venue]
+Organized By: [Enter organizer]
+
+Introduction:
+[Write a brief introduction about the event's purpose and objectives]
+
+Event Details:
+[Describe what happened during the event, including timeline and activities]
+
+Highlights:
+[List key moments, special attractions, or notable participants]
+
+Outcome/Conclusion:
+[Summarize the event's success, learnings, and future plans]"""
+
+            return render_template('event_report.html',
+                                reports=reports,
+                                past_events=past_events,
+                                report_template=report_template,
+                                current_date=datetime.now().date())
 
     except mysql.connector.Error as err:
         flash(f"Database error: {err}", 'error')
         return redirect('/dashboard')
     finally:
-        conn.close()
+        if conn:
+            conn.close()
 
 from werkzeug.utils import secure_filename
 from datetime import datetime
@@ -342,6 +368,49 @@ def create_report():
 
     return redirect('/event-reports')
 
+@app.route('/view-reports')
+def view_reports():
+    if 'user_id' not in session:
+        return redirect('/login')
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+
+        # Get reports with event details
+        cursor.execute("""
+    SELECT 
+        r.ReportID,
+        r.Content,
+        r.CreatedAt,
+        e.EventName,
+        e.Date AS EventDate,  # Fixed column alias
+        GROUP_CONCAT(rp.filename) AS photos 
+    FROM Reports r
+    JOIN Events e ON r.EventID = e.EventID
+    LEFT JOIN ReportPhotos rp ON r.ReportID = rp.ReportID
+    WHERE e.Date < CURDATE()
+    GROUP BY r.ReportID
+    ORDER BY r.CreatedAt DESC
+""")
+        reports = cursor.fetchall()
+
+        # Process photo filenames
+        for report in reports:
+            report['photos'] = report['photos'].split(',') if report['photos'] else []
+
+        return render_template('view_report.html', reports=reports)
+
+    except mysql.connector.Error as err:
+        flash(f"Database error: {err}", 'error')
+        return redirect('/dashboard')
+    except Exception as e:
+        flash("Error loading reports", 'error')
+        return redirect('/dashboard')
+    finally:
+        if 'conn' in locals() and conn.is_connected():
+            cursor.close()
+            conn.close()
 
 @app.route('/create-event', methods=['POST'])
 def create_event():
@@ -727,7 +796,7 @@ def logout():
     session.clear()
     return redirect('/')
 
-# Add these new routes to your existing app.py
+
 
 @app.route('/submit-feedback/<int:event_id>', methods=['GET', 'POST'])
 def submit_feedback(event_id):
@@ -871,7 +940,6 @@ def view_feedback(event_id):
         conn.close()
 
 if __name__ == '__main__':
-    # Create upload folder if not exists
     if not os.path.exists(UPLOAD_FOLDER):
         os.makedirs(UPLOAD_FOLDER)
     app.run(debug=True)

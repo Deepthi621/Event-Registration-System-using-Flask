@@ -57,9 +57,28 @@
       border-left: 4px solid #ff6f61;
       padding-left: 1rem;
       margin: 1rem 0;
+      white-space: pre-line;
+      line-height: 1.7;
+      font-size: 0.95rem;
     }
     .navbar {
       background-color: #ff6f61 !important;
+    }
+    .content-textarea {
+      white-space: pre-wrap;
+      line-height: 1.6;
+      font-family: 'Courier New', Courier, monospace;
+      min-height: 200px;
+    }
+    .template-container {
+      border: 2px dashed #ff6f61;
+      background-color: #fff9f9;
+    }
+    .template-content {
+      font-family: 'Courier New', monospace;
+      color: #666;
+      white-space: pre-wrap;
+      pointer-events: none;
     }
   </style>
 </head>
@@ -99,7 +118,7 @@
               <span class="text-muted small">{{ report.EventDate.strftime('%d %b %Y') }}</span>
             </div>
             <div class="report-content">
-              <p class="mb-0">{{ report.Content }}</p>
+              {{ report.Content|safe }}
             </div>
             {% if report.photos %}
             <div class="row g-2 mt-3">
@@ -124,7 +143,7 @@
     </div>
   </main>
 
-  <!-- Modal -->
+  <!-- Create Report Modal -->
   <div class="modal fade" id="createReportModal" tabindex="-1" aria-labelledby="createReportModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
       <div class="modal-content border-danger rounded-3">
@@ -135,6 +154,13 @@
           </div>
           <div class="modal-body">
             <div class="mb-3">
+              <label class="form-label fw-bold text-danger">Report Template</label>
+              <div class="template-container bg-light p-3 mb-2 rounded-2">
+                <pre class="template-content m-0">{{ report_template }}</pre>
+              </div>
+            </div>
+
+            <div class="mb-3">
               <label class="form-label fw-bold text-danger">Select Event</label>
               <select name="event_id" class="form-select border-danger" required>
                 <option value="">Choose an event</option>
@@ -143,10 +169,36 @@
                 {% endfor %}
               </select>
             </div>
+
             <div class="mb-3">
               <label class="form-label fw-bold text-danger">Report Content</label>
-              <textarea name="content" class="form-control border-danger" rows="5" required placeholder="Share details about the event..."></textarea>
+              <textarea 
+                name="content" 
+                class="form-control border-danger content-textarea" 
+                rows="12" 
+                required 
+                placeholder="Example structure:
+
+• Event Overview:
+  - Date: {{ current_date.strftime('%Y-%m-%d') }}
+  - Total Participants: 150
+  - Key Speakers: John Doe, Jane Smith
+
+• Highlights:
+  - Successful workshop sessions
+  - Networking opportunities
+  - Keynote speeches
+
+• Challenges:
+  - Technical difficulties in first session
+  - Late registrations
+
+• Future Improvements:
+  - Better time management
+  - Enhanced registration system"></textarea>
+              <small class="text-muted mt-2 d-block">Tip: Use line breaks and bullet points for better formatting</small>
             </div>
+
             <div class="mb-3">
               <label class="form-label fw-bold text-danger">Upload Photos</label>
               <input type="file" name="photos" class="form-control border-danger" multiple accept="image/*" id="photoUpload">
