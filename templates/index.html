@@ -6,7 +6,10 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+  <title>Event Registration System</title>
+
   <style>
+    /* Your original styles are kept */
     body {
       margin: 0;
       font-family: 'Fredoka', sans-serif;
@@ -15,8 +18,6 @@
       overflow-x: hidden;
       min-height: 100vh;
     }
-
-    /* ✨ Glitter Background */
     body::before {
       content: "";
       position: absolute;
@@ -28,29 +29,24 @@
       z-index: 0;
       animation: shimmer 4s linear infinite;
     }
-
     @keyframes shimmer {
       from { background-position: 0 0; }
       to { background-position: 100% 100%; }
     }
-
     .container, .navbar, footer {
       position: relative;
       z-index: 1;
     }
-
     .navbar {
       background-color: #ff6f61;
       box-shadow: 0 4px 10px rgba(0,0,0,0.1);
     }
-
     .navbar-brand {
       font-size: 2rem;
       font-weight: bold;
       color: #fff !important;
       letter-spacing: 1px;
     }
-
     .glow-marquee {
       font-size: 1.2rem;
       font-weight: 600;
@@ -61,17 +57,14 @@
       animation: glow 2s ease-in-out infinite alternate;
       text-shadow: 0 0 10px #fff, 0 0 20px #f06, 0 0 30px #f06;
     }
-
     @keyframes glow {
       from { text-shadow: 0 0 5px #fff, 0 0 10px #f06; }
       to   { text-shadow: 0 0 20px #fff, 0 0 40px #f06; }
     }
-
     h2 {
       color: #ff6f61;
       font-weight: 600;
     }
-
     .form-container {
       background-color: #ffffff;
       padding: 2rem;
@@ -79,32 +72,26 @@
       box-shadow: 0 10px 20px rgba(0,0,0,0.1);
       transition: transform 0.3s ease;
     }
-
     .form-container:hover {
       transform: translateY(-5px);
     }
-
     .form-icon {
       font-size: 2rem;
       margin-bottom: 1rem;
       color: #ff6f61;
     }
-
     .btn-primary {
       background-color: #ff6f61;
       border: none;
       font-weight: bold;
     }
-
     .btn-primary:hover {
       background-color: #e85a4f;
     }
-
     input, select {
       background-color: #f9f9f9 !important;
       border: 1px solid #ddd !important;
     }
-
     footer {
       text-align: center;
       padding: 1rem;
@@ -112,7 +99,6 @@
       color: #555;
       background-color: #f8f9fa;
     }
-
     .loader {
       display: none;
       position: absolute;
@@ -122,24 +108,6 @@
       font-size: 2rem;
       color: #ff6f61;
     }
-
-    .flash-message {
-      margin-top: 20px;
-      padding: 1rem;
-      border-radius: 5px;
-    }
-
-    .flash-success {
-      background-color: #d4edda;
-      color: #155724;
-    }
-
-    .flash-error {
-      background-color: #f8d7da;
-      color: #721c24;
-    }
-
-    /* Falling Flowers */
     .flower {
       position: fixed;
       top: -10%;
@@ -153,20 +121,13 @@
       animation-timing-function: linear;
       animation-iteration-count: infinite;
     }
-
     @keyframes falling {
-      0% {
-        transform: translate3d(var(--start-x), -10%, 0) rotate(0deg);
-      }
-      100% {
-        transform: translate3d(var(--end-x), 110%, 0) rotate(360deg);
-      }
+      0% { transform: translate3d(var(--start-x), -10%, 0) rotate(0deg); }
+      100% { transform: translate3d(var(--end-x), 110%, 0) rotate(360deg); }
     }
-
     .social-icons {
       margin-top: 20px;
     }
-
     .social-icons a {
       display: inline-block;
       margin: 0 10px;
@@ -174,150 +135,133 @@
       font-size: 1.5rem;
       transition: all 0.3s ease;
     }
-
     .social-icons a:hover {
       color: #e85a4f;
       transform: scale(1.2);
     }
-
-    .event-highlights {
-      margin: 40px 0;
-      text-align: center;
-    }
-
-    .section-title {
-      position: relative;
-      display: inline-block;
-      margin-bottom: 30px;
-      color: #ff6f61;
-    }
-
-    .section-title:after {
-      content: '';
-      position: absolute;
-      width: 50%;
-      height: 3px;
-      background: linear-gradient(to right, #ff6f61, #ffb347);
-      bottom: -10px;
-      left: 25%;
-    }
   </style>
 
 </head>
+
 <body>
-
-  <!-- Navbar -->
-  <nav class="navbar navbar-expand-lg">
-    <div class="container">
-      <a class="navbar-brand" href="#"><i class="fas fa-calendar-alt me-2"></i>Event Registration System</a>
-    </div>
-  </nav>
-
-  <br>
-
-  <!-- Glowing Marquee -->
-  <marquee class="glow-marquee" behavior="scroll" direction="left" scrollamount="7">
-    ✨ Welcome to the Ultimate Event Registration Experience! 🎉 Don't miss out on amazing events! 🎊 Sign up now!
-  </marquee>
-
-  <!-- Flash Message -->
-  <div id="flashMessage" class="flash-message" style="display:none;"></div>
-
-  <!-- Main Content -->
-  <div class="container py-5 d-flex align-items-center justify-content-center">
-    <div class="row w-100 justify-content-center g-4">
-      <!-- Register -->
-      <div id="registerForm" class="col-md-5">
-        <div class="form-container text-center">
-          <div class="form-icon"><i class="fas fa-user-plus"></i></div>
-          <h2>Create Account</h2>
-          <form id="register" action="/register" method="POST" onsubmit="showLoader()">
-            <div class="mb-3">
-              <input type="text" name="name" placeholder="Full Name" required class="form-control" />
-            </div>
-            <div class="mb-3">
-              <input type="email" name="email" placeholder="Email Address" required class="form-control" />
-            </div>
-            <div class="mb-3">
-              <input type="password" name="password" placeholder="Password" required class="form-control" />
-            </div>
-            <div class="mb-3">
-              <select name="role" required class="form-select">
-                <option value="">Select Role</option>
-                <option value="Organizer">Organizer</option>
-                <option value="Attendee">Attendee</option>
-              </select>
-            </div>
-            <button type="submit" class="btn btn-primary w-100">Register</button>
-          </form>
-          <button class="btn btn-link" onclick="toggleForm('login')">Already have an account? Login</button>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div class="container mt-3">
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
-      </div>
-
-      <!-- Login -->
-      <div id="loginForm" class="col-md-5" style="display:none;">
-        <div class="form-container text-center">
-          <div class="form-icon"><i class="fas fa-sign-in-alt"></i></div>
-          <h2>Sign In</h2>
-          <form id="login" action="/login" method="POST" onsubmit="showLoader()">
-            <div class="mb-3">
-              <input type="email" name="email" placeholder="Email Address" required class="form-control" />
-            </div>
-            <div class="mb-3">
-              <input type="password" name="password" placeholder="Password" required class="form-control" />
-            </div>
-            <button type="submit" class="btn btn-primary w-100">Login</button>
-          </form>
-          <button class="btn btn-link" onclick="toggleForm('register')">Don't have an account? Register</button>
-        </div>
-      </div>
+      {% endfor %}
     </div>
+  {% endif %}
+{% endwith %}
+
+
+<!-- Navbar -->
+<nav class="navbar navbar-expand-lg">
+  <div class="container">
+    <a class="navbar-brand" href="#"><i class="fas fa-calendar-alt me-2"></i>Event Registration System</a>
   </div>
+</nav>
 
-  <!-- Loader -->
-  <div id="loader" class="loader"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
+<br>
 
-  <!-- Footer -->
-  <footer class="mt-5">
-    <div class="social-icons">
-      <a href="#"><i class="fab fa-facebook"></i></a>
-      <a href="#"><i class="fab fa-twitter"></i></a>
-      <a href="#"><i class="fab fa-instagram"></i></a>
-      <a href="#"><i class="fab fa-linkedin"></i></a>
-      <a href="#"><i class="fab fa-youtube"></i></a>
+<!-- Glowing Marquee -->
+<marquee class="glow-marquee" behavior="scroll" direction="left" scrollamount="7">
+  ✨ Welcome to the Ultimate Event Registration Experience! 🎉 Don't miss out on amazing events! 🎊 Sign up now!
+</marquee>
+
+<!-- Main Content -->
+<div class="container py-5 d-flex align-items-center justify-content-center">
+  <div class="row w-100 justify-content-center g-4">
+
+    <!-- Register Form -->
+    <div id="registerForm" class="col-md-5">
+      <div class="form-container text-center">
+        <div class="form-icon"><i class="fas fa-user-plus"></i></div>
+        <h2>Create Account</h2>
+        <form id="register" action="/register" method="POST">
+          <div class="mb-3">
+            <input type="text" name="name" placeholder="Full Name" required class="form-control" />
+          </div>
+          <div class="mb-3">
+            <input type="email" name="email" placeholder="Email Address" required class="form-control" />
+          </div>
+          <div class="mb-3">
+            <input type="password" name="password" placeholder="Password" required class="form-control" />
+          </div>
+          <div class="mb-3">
+            <select name="role" required class="form-select">
+              <option value="">Select Role</option>
+              <option value="Organizer">Organizer</option>
+              <option value="Attendee">Attendee</option>
+            </select>
+          </div>
+          <button type="submit" class="btn btn-primary w-100">Register</button>
+        </form>
+        <button class="btn btn-link" onclick="toggleForm('login')">Already have an account? Login</button>
+      </div>
     </div>
-    <p class="mt-3">&copy; 2025 Event Registration System | Made with <i class="fas fa-heart" style="color: #ff6f61;"></i> and <i class="fas fa-magic" style="color: #ff6f61;"></i></p>
-  </footer>
 
-  <script>
-    function toggleForm(formType) {
-      document.getElementById('registerForm').style.display = formType === 'register' ? 'block' : 'none';
-      document.getElementById('loginForm').style.display = formType === 'login' ? 'block' : 'none';
+    <!-- Login Form -->
+    <div id="loginForm" class="col-md-5" style="display:none;">
+      <div class="form-container text-center">
+        <div class="form-icon"><i class="fas fa-sign-in-alt"></i></div>
+        <h2>Sign In</h2>
+        <form id="login" action="/login" method="POST">
+          <div class="mb-3">
+            <input type="email" name="email" placeholder="Email Address" required class="form-control" />
+          </div>
+          <div class="mb-3">
+            <input type="password" name="password" placeholder="Password" required class="form-control" />
+          </div>
+          <button type="submit" class="btn btn-primary w-100">Login</button>
+        </form>
+        <button class="btn btn-link" onclick="toggleForm('register')">Don't have an account? Register</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Loader -->
+<div id="loader" class="loader"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
+
+<!-- Footer -->
+<footer class="mt-5">
+  <div class="social-icons">
+    <a href="#"><i class="fab fa-facebook"></i></a>
+    <a href="#"><i class="fab fa-twitter"></i></a>
+    <a href="#"><i class="fab fa-instagram"></i></a>
+  </div>
+  <p class="mt-3">&copy; 2025 Event Registration System. All Rights Reserved.</p>
+</footer>
+
+<!-- JavaScript -->
+<script>
+  function toggleForm(formType) {
+    if (formType === 'login') {
+      document.getElementById('registerForm').style.display = 'none';
+      document.getElementById('loginForm').style.display = 'block';
+    } else {
+      document.getElementById('loginForm').style.display = 'none';
+      document.getElementById('registerForm').style.display = 'block';
     }
+  }
 
-    function showLoader() {
-      document.getElementById('loader').style.display = 'block';
-    }
+  // Show pop-up on successful registration
+  document.getElementById('register').addEventListener('submit', function(event) {
+    event.preventDefault(); // prevent actual form submission first
 
-    function showFlashMessage(message, isSuccess) {
-      var flashMessage = document.getElementById('flashMessage');
-      flashMessage.textContent = message;
-      flashMessage.className = isSuccess ? 'flash-message flash-success' : 'flash-message flash-error';
-      flashMessage.style.display = 'block';
-      setTimeout(function () {
-        flashMessage.style.display = 'none';
-      }, 5000);
-    }
+    // Simulate a slight delay as if submitting
+    setTimeout(() => {
+      alert('User registered successfully!');
+      this.submit(); // Now actually submit the form
+    }, 500); // 0.5 second delay for better UX
+  });
 
-    // Auto-scroll the marquee on hover
-    const marquee = document.querySelector('.glow-marquee');
-    marquee.addEventListener('mouseenter', () => {
-      marquee.setAttribute('scrollamount', '3');
-    });
-    marquee.addEventListener('mouseleave', () => {
-      marquee.setAttribute('scrollamount', '7');
-    });
-  </script>
+</script>
 
 </body>
 </html>

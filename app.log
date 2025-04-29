@@ -1,0 +1,70 @@
+2025-04-28 23:11:50,054 - app - DEBUG - Attempting to send welcome email to bcbhavana233@gmail.com
+2025-04-28 23:11:52,420 - app - ERROR - Email delivery failed: 'NoneType' object is not callable
+Traceback (most recent call last):
+  File "C:\Users\bcbha\OneDrive\Desktop\EVENT\app.py", line 123, in register_user
+    if not mail.validate(email):
+           ^^^^^^^^^^^^^^^^^^^^
+TypeError: 'NoneType' object is not callable
+2025-04-29 19:05:52,351 - app - INFO - User bcbhavana233@gmail.com registered successfully.
+2025-04-29 19:05:52,360 - app - ERROR - Failed to send welcome email to bcbhavana233@gmail.com: [Errno 11001] getaddrinfo failed
+2025-04-29 19:12:31,674 - app - INFO - User bcbhavana233@gmail.com registered successfully.
+2025-04-29 19:12:36,637 - app - INFO - Welcome email sent successfully to bcbhavana233@gmail.com
+2025-04-29 19:22:27,318 - app - INFO - User 2023cs_deepthip_a@nie.ac.in registered successfully.
+2025-04-29 19:22:31,713 - app - INFO - Welcome email sent successfully to 2023cs_deepthip_a@nie.ac.in
+2025-04-29 19:23:13,158 - app - INFO - User 2023cs_deekshapriyaca_a@nie.ac.in registered successfully.
+2025-04-29 19:23:18,594 - app - INFO - Welcome email sent successfully to 2023cs_deekshapriyaca_a@nie.ac.in
+2025-04-29 19:25:13,895 - app - INFO - User 2023cs_bhavanabc_a@nie.ac.in registered successfully.
+2025-04-29 19:25:18,130 - app - INFO - Welcome email sent successfully to 2023cs_bhavanabc_a@nie.ac.in
+2025-04-29 19:38:10,976 - app - ERROR - Registration database error for UserID 31 EventID 1: 1054 (42S22): Unknown column 'Title' in 'field list'
+Traceback (most recent call last):
+  File "C:\Users\bcbha\OneDrive\Desktop\EVENT\.venv\Lib\site-packages\mysql\connector\connection_cext.py", line 755, in cmd_query
+    self._cmysql.query(
+_mysql_connector.MySQLInterfaceError: Unknown column 'Title' in 'field list'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\bcbha\OneDrive\Desktop\EVENT\app.py", line 636, in register_event
+    cursor.execute("""
+  File "C:\Users\bcbha\OneDrive\Desktop\EVENT\.venv\Lib\site-packages\mysql\connector\cursor_cext.py", line 351, in execute
+    self._connection.cmd_query(
+  File "C:\Users\bcbha\OneDrive\Desktop\EVENT\.venv\Lib\site-packages\mysql\connector\opentelemetry\context_propagation.py", line 97, in wrapper
+    return method(cnx, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bcbha\OneDrive\Desktop\EVENT\.venv\Lib\site-packages\mysql\connector\connection_cext.py", line 763, in cmd_query
+    raise get_mysql_exception(
+mysql.connector.errors.ProgrammingError: 1054 (42S22): Unknown column 'Title' in 'field list'
+2025-04-29 19:45:07,834 - app - INFO - User 31 created registration 63 for EventID 1.
+2025-04-29 19:45:07,838 - app - INFO - Created payment record 35 for registration 63 with amount 150.0.
+2025-04-29 19:45:07,854 - app - INFO - Transaction committed for registration 63, capacity updated for EventID 1.
+2025-04-29 19:45:07,860 - app - INFO - Retrieved user email 2023cs_bhavanabc_a@nie.ac.in for confirmation.
+2025-04-29 19:45:07,870 - app - INFO - Initiated sending registration confirmation email for RegistrationID 63 to 2023cs_bhavanabc_a@nie.ac.in.
+2025-04-29 19:45:12,800 - app - INFO - Welcome email sent successfully to 2023cs_bhavanabc_a@nie.ac.in
+2025-04-29 20:04:27,693 - app - INFO - User 31 created registration 64 for EventID 11.
+2025-04-29 20:04:27,701 - app - INFO - Created payment record 36 for registration 64 with amount 50.0.
+2025-04-29 20:04:27,727 - app - INFO - Transaction committed for registration 64, capacity updated for EventID 11.
+2025-04-29 20:04:27,735 - app - INFO - Retrieved user email 2023cs_bhavanabc_a@nie.ac.in for confirmation.
+2025-04-29 20:04:27,759 - app - INFO - Initiated sending registration confirmation email for RegistrationID 64 to 2023cs_bhavanabc_a@nie.ac.in.
+2025-04-29 20:04:32,694 - app - INFO - Welcome email sent successfully to 2023cs_bhavanabc_a@nie.ac.in
+2025-04-29 20:04:47,090 - app - ERROR - Cancellation database error for registration 64: 1054 (42S22): Unknown column 'E.UserID' in 'on clause'
+Traceback (most recent call last):
+  File "C:\Users\bcbha\OneDrive\Desktop\EVENT\.venv\Lib\site-packages\mysql\connector\connection_cext.py", line 755, in cmd_query
+    self._cmysql.query(
+_mysql_connector.MySQLInterfaceError: Unknown column 'E.UserID' in 'on clause'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\bcbha\OneDrive\Desktop\EVENT\app.py", line 926, in cancel_registration
+    cursor.execute("""
+  File "C:\Users\bcbha\OneDrive\Desktop\EVENT\.venv\Lib\site-packages\mysql\connector\cursor_cext.py", line 351, in execute
+    self._connection.cmd_query(
+  File "C:\Users\bcbha\OneDrive\Desktop\EVENT\.venv\Lib\site-packages\mysql\connector\opentelemetry\context_propagation.py", line 97, in wrapper
+    return method(cnx, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bcbha\OneDrive\Desktop\EVENT\.venv\Lib\site-packages\mysql\connector\connection_cext.py", line 763, in cmd_query
+    raise get_mysql_exception(
+mysql.connector.errors.ProgrammingError: 1054 (42S22): Unknown column 'E.UserID' in 'on clause'
+2025-04-29 20:08:14,480 - app - INFO - Registration 64 cancelled successfully.
+2025-04-29 20:08:14,491 - app - INFO - Initiated sending cancellation confirmation email to 2023cs_bhavanabc_a@nie.ac.in for registration 64.
+2025-04-29 20:08:23,530 - app - INFO - Welcome email sent successfully to 2023cs_bhavanabc_a@nie.ac.in

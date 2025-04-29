@@ -5,14 +5,14 @@ DB_CONFIG = {
     'database': 'EventRegistrationDB'
 }
 
-# --- Email Configuration for Flask-Mail ---
-# IMPORTANT: Replace these with your actual email provider settings.
-# Using environment variables is recommended for production secrets!
-MAIL_SERVER = 'your_mail_server' # e.g., 'smtp.gmail.com'
-MAIL_PORT = 587 # Common ports: 587 (TLS), 465 (SSL)
-MAIL_USE_TLS = True # Set to False if using SSL (port 465)
-MAIL_USE_SSL = False # Set to True if using SSL (port 465)
-MAIL_USERNAME = 'your_email@example.com' # Your email address
-MAIL_PASSWORD = 'your_email_password'   # Your email password
-MAIL_DEFAULT_SENDER = 'your_email@example.com' # Or the name you want to display <your_email@example.com>
-# -----------------------------------------
+# --- Email Configuration for Flask-Mail (using Gmail) ---
+# IMPORTANT: Use an App Password if you have 2-Factor Authentication enabled (recommended).
+# Your regular Google account password will likely NOT work here if 2FA is on.
+MAIL_SERVER = 'smtp.gmail.com'
+MAIL_PORT = 587          # Use port 587 for TLS
+MAIL_USE_TLS = True      # Enable TLS
+MAIL_USE_SSL = False     # Disable SSL when using TLS on port 587
+MAIL_USERNAME = 'bhavanabc05@gmail.com' # <-- Use your Gmail address here
+MAIL_PASSWORD = 'tcss ykfz mkys pleh'   # <-- REPLACE THIS with the 16-character App Password you generated
+MAIL_DEFAULT_SENDER = 'Your Event App <bhavanabc05@gmail.com>' # <-- Use your Gmail and desired display name
+# --------------------------------------------------------

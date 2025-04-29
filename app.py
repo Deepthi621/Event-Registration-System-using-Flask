@@ -1,25 +1,63 @@
-from flask import Flask, render_template, request, redirect, session, flash
+from flask import Flask, render_template, request, redirect, session, flash, url_for # Added url_for just in case
 import mysql.connector
 from config import DB_CONFIG
-from datetime import datetime, date,time
+from datetime import datetime, date, time
 import os
+import re
+from threading import Thread # Import Thread
+from flask_mail import Mail, Message
+# import smtplib # Not strictly needed if using Flask-Mail
+from markupsafe import escape
+import logging
+from logging.handlers import RotatingFileHandler
+
+handler = RotatingFileHandler('app.log', maxBytes=10000, backupCount=3)
+handler.setLevel(logging.DEBUG)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+handler.setFormatter(formatter)
 
 app = Flask(__name__)
-app.secret_key = 'your_secure_secret_key'
+app.secret_key = 'your_secure_secret_key' # Consider using environment variables
 UPLOAD_FOLDER = 'static/uploads'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.logger.addHandler(handler)
+app.logger.setLevel(logging.DEBUG)
+
+# Configure Flask-Mail (make sure these match your config.py)
+app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+app.config['MAIL_PORT'] = 587
+app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_USERNAME'] = 'bhavanabc05@gmail.com' # Use environment variable
+# WARNING: Ensure there are no trailing spaces in your password!
+app.config['MAIL_PASSWORD'] = 'tcssykfzmkyspleh'  # Use environment variable and ACTUAL app password
+app.config['MAIL_DEFAULT_SENDER'] = ('Event Portal', 'bhavanabc05@gmail.com') # Use MAIL_DEFAULT_SENDER
+mail = Mail(app)
+
 
 def get_db_connection():
     try:
         return mysql.connector.connect(**DB_CONFIG)
     except mysql.connector.Error as err:
-        flash(f"Database connection error: {err}", 'error')
+        app.logger.error(f"Database connection error: {err}") # Log DB errors
+        flash(f"Database connection error. Please try again later.", 'error') # User-friendly message
         return None
 
 def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+# --- Helper Function for Async Email ---
+def send_async_email(app_context, msg):
+    """Sends email in a separate thread."""
+    with app_context: # Need app context for Flask-Mail to work correctly in a thread
+        try:
+            mail.send(msg)
+            app.logger.info(f"Welcome email sent successfully to {msg.recipients[0]}")
+        except Exception as e:
+            app.logger.error(f"Failed to send welcome email to {msg.recipients[0]}: {str(e)}")
+            # You might want to add more robust error handling here,
+            # like retrying or notifying an admin
 
 # ----------------------
 # Routes
@@ -27,39 +65,120 @@ def allowed_file(filename):
 
 @app.route('/')
 def home():
+    # Check for flash messages from registration/login if needed
     return render_template('index.html')
+
+@app.route('/test-email')
+def test_email():
+    try:
+        # Use default sender from config
+        msg = Message('Test Email from Event Portal',
+                      recipients=['2023cs_bhavanabc_a@nie.ac.in']) # Send to your test recipient
+        msg.body = f"This is a test email sent at {datetime.now()} from your Flask app configured with Flask-Mail."
+        # Optional: Add HTML body
+        # msg.html = "<h1>Test Email</h1><p>This is a <b>test</b> email.</p>"
+
+        # Send synchronously for testing purposes
+        mail.send(msg)
+
+        app.logger.info("Test email sent successfully!")
+        return "Test Email sent successfully!"
+    except Exception as e:
+        app.logger.error(f"Error sending test email: {str(e)}")
+        return f"Error sending test email: {str(e)}"
+
 
 @app.route('/register', methods=['POST'])
 def register_user():
     name = request.form.get('name')
     email = request.form.get('email')
-    password = request.form.get('password')
+    password = request.form.get('password') # Consider hashing the password!
     role = request.form.get('role')
 
+    # Basic Validation (Add more robust validation as needed)
     if not all([name, email, password, role]):
         flash("All fields are required!", 'error')
-        return redirect('/')
+        return redirect(url_for('home')) # Redirect to home or specific registration page
+
+    # Email format validation (simple example)
+    if not re.match(r"[^@]+@[^@]+\.[^@]+", email):
+         flash("Invalid email format!", 'error')
+         return redirect(url_for('home'))
 
     conn = get_db_connection()
     if not conn:
-        return redirect('/')
+        # Flash message is already set in get_db_connection
+        return redirect(url_for('home'))
 
     try:
         with conn.cursor() as cursor:
+            # Check if email already exists
+            cursor.execute("SELECT Email FROM Users WHERE Email = %s", (email,))
+            existing_user = cursor.fetchone()
+            if existing_user:
+                flash("Email already exists! Please login or use a different email.", 'error')
+                conn.close()
+                return redirect(url_for('home'))
+
+            # **IMPORTANT: Hash the password before storing!**
+            # Use a library like werkzeug.security or passlib
+            # Example using werkzeug (install with pip install Werkzeug):
+            # from werkzeug.security import generate_password_hash
+            # hashed_password = generate_password_hash(password)
+            # For now, storing plain text as per original code, but strongly advise against it.
+            hashed_password = password # Replace with actual hashing
+
             cursor.execute(
                 "INSERT INTO Users (Name, Email, Password, Role) VALUES (%s, %s, %s, %s)",
-                (name, email, password, role)
+                (name, email, hashed_password, role) # Store hashed password
             )
             conn.commit()
-            flash("Registration successful! Please login.", 'success')
-    except mysql.connector.IntegrityError:
-        flash("Email already exists!", 'error')
-    except mysql.connector.Error as err:
-        flash(f"Registration failed: {err}", 'error')
-    finally:
-        conn.close()
+            app.logger.info(f"User {email} registered successfully.")
 
-    return redirect('/')
+            # --- Send Welcome Email (Asynchronously) ---
+            try:
+                msg_subject = "Welcome to Event Portal!"
+                # You can create an HTML template for a nicer email
+                # msg_html = render_template('emails/welcome.html', user_name=name)
+                msg_body = f"Hi {escape(name)},\n\nThank you for registering at Event Portal.\nWe're excited to have you!\n\nYou can now log in using your email address.\n\nBest regards,\nThe Event Portal Team"
+
+                msg = Message(subject=msg_subject,
+                              recipients=[email],
+                              body=msg_body)
+                              # html=msg_html) # Uncomment if using HTML email
+
+                # Pass the app context to the thread
+                thread = Thread(target=send_async_email, args=[app.app_context(), msg])
+                thread.start()
+                # If you wanted synchronous sending (not recommended for web requests):
+                # mail.send(msg)
+                # app.logger.info(f"Welcome email sent successfully to {email}")
+
+            except Exception as e:
+                # Log the error, but don't stop the user registration flow
+                app.logger.error(f"Failed to *initiate* sending welcome email to {email}: {str(e)}")
+                # You could flash a milder warning if needed, but generally logging is sufficient
+                # flash("Registration successful, but couldn't send welcome email.", 'warning')
+                flash("Registration successful! Please check your email (optional) and login.", "success")
+
+
+    # It's better to catch specific errors if possible
+    except mysql.connector.IntegrityError: # Handles race conditions if email check fails
+        flash("Email already exists!", 'error')
+        app.logger.warning(f"Registration attempt failed for existing email: {email}")
+    except mysql.connector.Error as err:
+        flash(f"Registration failed due to a database error. Please try again later.", 'error') # User-friendly message
+        app.logger.error(f"Registration database error for {email}: {err}")
+    except Exception as e:
+        flash("An unexpected error occurred during registration. Please try again later.", 'error')
+        app.logger.error(f"Unexpected registration error for {email}: {e}", exc_info=True) # Log stack trace
+    finally:
+        if conn and conn.is_connected():
+            conn.close()
+
+    return redirect(url_for('home')) # Redirect to home or login page
+
+# ... (rest of your routes and main execution block) ...
 
 @app.route('/login', methods=['POST'])
 def login():
@@ -488,11 +607,17 @@ def create_event():
 
 @app.route('/register-event/<int:event_id>', methods=['GET', 'POST'])
 def register_event(event_id):
+    # Initialize registration_id to None to avoid potential unassigned variable warnings
+    registration_id = None
+
+    # Check if user is logged in and is an Attendee
     if 'user_id' not in session or session.get('role') != 'Attendee':
+        flash("Please log in as an Attendee to register for events.", 'warning')
         return redirect('/')
 
     conn = get_db_connection()
     if not conn:
+        # Flash message is already set in get_db_connection
         return redirect('/dashboard')
 
     try:
@@ -510,10 +635,10 @@ def register_event(event_id):
                 conn.rollback()
                 return redirect('/dashboard')
 
-            # Get event details with lock
+            # Get event details (using correct column names based on your schema) with lock
             cursor.execute("""
-                SELECT Fee, Capacity FROM Events 
-                WHERE EventID = %s AND Date >= CURDATE() 
+                SELECT EventName, Date, StartTime, Fee, Capacity FROM Events
+                WHERE EventID = %s AND Date >= CURDATE()
                 FOR UPDATE
             """, (event_id,))
             event = cursor.fetchone()
@@ -523,7 +648,9 @@ def register_event(event_id):
                 conn.rollback()
                 return redirect('/dashboard')
 
-            fee, capacity = float(event[0]), int(event[1])
+            # Adjust variables to match the order of columns selected
+            event_name, event_date, start_time, fee, capacity = event[0], event[1], event[2], float(event[3]), int(event[4])
+
             if capacity <= 0:
                 flash("Event is full!", 'error')
                 conn.rollback()
@@ -539,53 +666,117 @@ def register_event(event_id):
 
             if existing_reg:
                 # Reactivate cancelled registration
-                registration_id = existing_reg[0]
+                registration_id = existing_reg[0] # registration_id is assigned here
                 cursor.execute("""
                     UPDATE Registrations
                     SET Status = 'Active', CancellationReason = NULL
                     WHERE RegistrationID = %s
                 """, (registration_id,))
-                
+
                 # Update payment if exists
                 cursor.execute("""
                     UPDATE Payments
                     SET Status = 'Pending'
                     WHERE RegistrationID = %s AND Status = 'Cancelled'
                 """, (registration_id,))
+                app.logger.info(f"User {session['user_id']} reactivated registration {registration_id} for EventID {event_id}.")
+
+
             else:
                 # Create new registration
                 cursor.execute("""
                     INSERT INTO Registrations (UserID, EventID, Status)
                     VALUES (%s, %s, 'Active')
                 """, (session['user_id'], event_id))
-                registration_id = cursor.lastrowid
+                registration_id = cursor.lastrowid # registration_id is assigned here
+                app.logger.info(f"User {session['user_id']} created registration {registration_id} for EventID {event_id}.")
 
                 # Create payment record
                 cursor.execute("""
                     INSERT INTO Payments (RegistrationID, Amount, Status)
                     VALUES (%s, %s, 'Pending')
                 """, (registration_id, fee))
+                app.logger.info(f"Created payment record {cursor.lastrowid} for registration {registration_id} with amount {fee}.")
+
 
             # Update capacity
             cursor.execute("""
-                UPDATE Events SET Capacity = Capacity - 1 
+                UPDATE Events SET Capacity = Capacity - 1
                 WHERE EventID = %s AND Capacity > 0
             """, (event_id,))
 
             if cursor.rowcount == 0:
-                flash("Failed to update event capacity!", 'error')
+                flash("Failed to update event capacity! Event might have just become full.", 'error')
                 conn.rollback()
                 return redirect('/dashboard')
 
             conn.commit()
-            flash("Registration successful! Please proceed to payment.", 'success')
+            # Use the assigned registration_id in the log
+            app.logger.info(f"Transaction committed for registration {registration_id}, capacity updated for EventID {event_id}.")
+
+            # --- Retrieve User Email and Name for Sending Confirmation ---
+            cursor.execute("SELECT Email, Name FROM Users WHERE UserID = %s", (session['user_id'],))
+            user_info = cursor.fetchone()
+            user_email, user_name = user_info[0], user_info[1]
+            app.logger.info(f"Retrieved user email {user_email} for confirmation.")
+
+
+            # --- Send Registration Confirmation Email (Asynchronously) ---
+            try:
+                msg_subject = f"Registration Confirmed for: {escape(event_name)}"
+                msg_body = (
+                    f"Hi {escape(user_name)},\n\n"
+                    f"This email confirms your registration for the event:\n\n"
+                    f"Event Name: {escape(event_name)}\n"
+                    f"Date: {event_date}\n"
+                    f"Start Time: {start_time.strftime('%H:%M') if isinstance(start_time, time) else start_time}\n\n" # Use start_time
+                    # Include End Time if you like
+                    # f"End Time: {end_time.strftime('%H:%M') if isinstance(end_time, time) else end_time}\n\n"
+                    f"Registration ID: {registration_id}\n" # registration_id is definitely available here
+                    f"Amount Due: {fee:.2f}\n\n"
+                    f"Please proceed to the payments section to complete your registration.\n\n"
+                    f"Best regards,\n"
+                    f"The Event Portal Team"
+                )
+
+                msg = Message(
+                    subject=msg_subject,
+                    recipients=[user_email],
+                    body=msg_body
+                )
+
+                # Pass the app context to the thread
+                thread = Thread(target=send_async_email, args=[app.app_context(), msg])
+                thread.start()
+                # Use the assigned registration_id in the log
+                app.logger.info(f"Initiated sending registration confirmation email for RegistrationID {registration_id} to {user_email}.")
+
+
+            except Exception as e:
+                # Log the error
+                app.logger.error(f"Failed to *initiate* sending registration confirmation email for RegistrationID {registration_id} to {user_email}: {str(e)}")
+                # Note: If the error occurred *before* registration_id was assigned, this log line might still error.
+                # However, with registration_id = None initialized, it will be None in that case.
+
+
+            flash("Registration successful! A confirmation email has been sent. Please proceed to payment.", 'success')
             return redirect('/payments')
 
     except mysql.connector.Error as err:
         conn.rollback()
-        flash(f"Registration failed: {err}", 'error')
+        flash(f"Registration failed due to a database error. Please try again later. Details: {err}", 'error')
+        app.logger.error(f"Registration database error for UserID {session.get('user_id')} EventID {event_id}: {err}", exc_info=True)
+        # If a DB error happens here before registration_id is assigned, registration_id will be None
+        # If the error happened AFTER registration_id was assigned, it will have the value.
+    except Exception as e:
+        conn.rollback()
+        flash("An unexpected error occurred during registration. Please try again later.", 'error')
+        app.logger.error(f"Unexpected registration error for UserID {session.get('user_id')} EventID {event_id}: {e}", exc_info=True)
+         # If an unexpected error happens here before registration_id is assigned, registration_id will be None
+         # If the error happened AFTER registration_id was assigned, it will have the value.
     finally:
-        conn.close()
+        if conn and conn.is_connected():
+            conn.close()
 
     return redirect('/dashboard')
 
@@ -731,13 +922,14 @@ def cancel_registration(registration_id):
         with conn.cursor() as cursor:
             cursor.execute("START TRANSACTION")
 
-            # Get event date along with registration details
+            # Get event details (EventName, StartTime), event Date, and user email
             cursor.execute("""
-                SELECT R.EventID, E.Date 
+                SELECT R.EventID, E.EventName, E.Date, E.StartTime, U.Email, U.Name
                 FROM Registrations R
                 JOIN Events E ON R.EventID = E.EventID
-                WHERE R.RegistrationID = %s 
-                AND R.UserID = %s 
+                JOIN Users U ON R.UserID = U.UserID  -- Corrected join condition
+                WHERE R.RegistrationID = %s
+                AND R.UserID = %s
                 AND R.Status = 'Active'
                 FOR UPDATE
             """, (registration_id, session['user_id']))
@@ -748,7 +940,7 @@ def cancel_registration(registration_id):
                 conn.rollback()
                 return redirect('/my-registrations')
 
-            event_id, event_date = result
+            event_id, event_name, event_date, start_time, user_email, user_name = result
 
             # Prevent cancellation for past events
             if event_date < date.today():
@@ -759,34 +951,72 @@ def cancel_registration(registration_id):
             # Update registration status with cancellation reason
             cursor.execute("""
                 UPDATE Registrations
-                SET Status = 'Cancelled', 
+                SET Status = 'Cancelled',
                     CancellationReason = %s
                 WHERE RegistrationID = %s
             """, (cancellation_reason, registration_id))
 
             # Increase event capacity
             cursor.execute("""
-                UPDATE Events 
-                SET Capacity = Capacity + 1 
+                UPDATE Events
+                SET Capacity = Capacity + 1
                 WHERE EventID = %s
             """, (event_id,))
 
             # Update payment status if exists and is pending
             cursor.execute("""
-                UPDATE Payments 
+                UPDATE Payments
                 SET Status = 'Cancelled'
-                WHERE RegistrationID = %s 
+                WHERE RegistrationID = %s
                 AND Status = 'Pending'
             """, (registration_id,))
 
             conn.commit()
-            flash("Registration cancelled successfully", 'success')
+            app.logger.info(f"Registration {registration_id} cancelled successfully.")
+
+            # --- Send Cancellation Confirmation Email (Asynchronously) ---
+            try:
+                msg_subject = f"Cancellation Confirmation for: {escape(event_name)}"
+                msg_body = (
+                    f"Hi {escape(user_name)},\n\n"
+                    f"This email confirms that your registration for the event:\n\n"
+                    f"Event Name: {escape(event_name)}\n"
+                    f"scheduled for {event_date} at {start_time.strftime('%H:%M') if isinstance(start_time, time) else start_time}\n"
+                    f"has been successfully cancelled.\n\n"
+                    f"We're sorry you won't be able to attend.\n\n"
+                    f"Reason for cancellation: {escape(cancellation_reason)}\n\n"
+                    f"If you have any questions, please contact us.\n\n"
+                    f"Best regards,\n"
+                    f"The Event Portal Team"
+                )
+
+                msg = Message(
+                    subject=msg_subject,
+                    recipients=[user_email],
+                    body=msg_body
+                )
+
+                # Pass the app context to the thread
+                thread = Thread(target=send_async_email, args=[app.app_context(), msg])
+                thread.start()
+                app.logger.info(f"Initiated sending cancellation confirmation email to {user_email} for registration {registration_id}.")
+
+            except Exception as e:
+                app.logger.error(f"Failed to initiate sending cancellation email to {user_email} for registration {registration_id}: {str(e)}")
+
+            flash("Registration cancelled successfully. A confirmation email has been sent.", 'success')
 
     except mysql.connector.Error as err:
         conn.rollback()
         flash(f"Cancellation failed: {err}", 'error')
+        app.logger.error(f"Cancellation database error for registration {registration_id}: {err}", exc_info=True)
+    except Exception as e:
+        conn.rollback()
+        flash(f"An unexpected error occurred during cancellation.",'error')
+        app.logger.error(f"Unexpected error during cancellation of registration {registration_id}: {e}", exc_info=True)
+
     finally:
-        if conn.is_connected():
+        if conn and conn.is_connected():
             conn.close()
 
     return redirect('/my-registrations')
@@ -801,39 +1031,46 @@ def logout():
 @app.route('/submit-feedback/<int:event_id>', methods=['GET', 'POST'])
 def submit_feedback(event_id):
     if 'user_id' not in session or session.get('role') != 'Attendee':
+        flash("Please log in as an Attendee to submit feedback.", 'warning')
         return redirect('/')
-    
+
     conn = get_db_connection()
     if not conn:
         return redirect('/my-registrations')
 
     try:
         with conn.cursor(dictionary=True) as cursor:
-            # Get event details with time validation
+            # Get event details with time validation and user info
+            # Added U.Email, U.Name to the select list
             cursor.execute("""
-                SELECT E.EventName, E.Date AS event_date, E.EndTime, 
-                       TIMESTAMP(E.Date, E.EndTime) AS event_end,
-                       TIMESTAMP(E.Date, E.EndTime) + INTERVAL 48 HOUR AS feedback_deadline
+                SELECT E.EventName, E.Date AS event_date, E.EndTime,
+                        TIMESTAMP(E.Date, E.EndTime) AS event_end,
+                        TIMESTAMP(E.Date, E.EndTime) + INTERVAL 48 HOUR AS feedback_deadline,
+                        U.Email, U.Name # Fetch user email and name here
                 FROM Events E
                 JOIN Registrations R ON E.EventID = R.EventID
-                WHERE R.UserID = %s 
-                AND E.EventID = %s 
+                JOIN Users U ON R.UserID = U.UserID # Join to get user details
+                WHERE R.UserID = %s
+                AND E.EventID = %s
                 AND R.Status = 'Active'
             """, (session['user_id'], event_id))
-            event_data = cursor.fetchone()
-            
-            if not event_data:
-                flash("Invalid event or registration", 'error')
+            event_user_data = cursor.fetchone()
+
+            if not event_user_data:
+                flash("Invalid event or registration for feedback submission.", 'error')
                 return redirect('/my-registrations')
 
-            from datetime import datetime, timedelta
+            # Extract data including user info
+            event_name = event_user_data['EventName']
+            user_email = event_user_data['Email']
+            user_name = event_user_data['Name']
 
             # Convert database times to Python datetime objects
             try:
-                event_end = event_data['event_end']
-                feedback_deadline = event_data['feedback_deadline']
+                event_end = event_user_data['event_end']
+                feedback_deadline = event_user_data['feedback_deadline']
             except KeyError:
-                flash("Event time data is invalid", 'error')
+                flash("Event time data is invalid.", 'error')
                 return redirect('/my-registrations')
 
             current_time = datetime.now()
@@ -845,56 +1082,108 @@ def submit_feedback(event_id):
 
             # Check if feedback window has expired
             if current_time > feedback_deadline:
-                flash("Feedback submission is only allowed within 48 hours after event completion", 'error')
+                flash("Feedback submission is only allowed within 48 hours after event completion.", 'error')
                 return redirect('/my-registrations')
 
-            # Handle form submission
+            # Handle form submission (POST request)
             if request.method == 'POST':
                 rating = request.form.get('rating')
                 comment = request.form.get('comment', '').strip()
 
                 if not rating or not rating.isdigit() or int(rating) not in range(1, 6):
-                    flash("Please provide a valid rating (1-5)", 'error')
+                    flash("Please provide a valid rating (1-5).", 'error')
                     return redirect(f'/submit-feedback/{event_id}')
 
                 try:
-                    with conn.cursor() as cursor:
-                        cursor.execute("""
+                    # We use a new cursor for the INSERT/UPDATE to avoid potential issues
+                    # with the dictionary=True cursor if needed, though it should be fine.
+                    # Explicitly creating a new one is safer if different cursor types/settings are used.
+                    with conn.cursor() as insert_cursor:
+                        insert_cursor.execute("""
                             INSERT INTO Feedback (UserID, EventID, Rating, Comment)
                             VALUES (%s, %s, %s, %s)
-                            ON DUPLICATE KEY UPDATE 
+                            ON DUPLICATE KEY UPDATE
                             Rating = VALUES(Rating), Comment = VALUES(Comment)
                         """, (session['user_id'], event_id, rating, comment))
                         conn.commit()
-                        flash("Feedback submitted successfully!", 'success')
-                        return redirect('/my-registrations')
+                        app.logger.info(f"Feedback submitted/updated by UserID {session['user_id']} for EventID {event_id}.")
+
+
+                    # --- Send Feedback Confirmation Email (Asynchronously) ---
+                    try:
+                        msg_subject = f"Feedback Received for: {escape(event_name)}"
+                        msg_body = (
+                            f"Hi {escape(user_name)},\n\n"
+                            f"Thank you for providing feedback for the event:\n\n"
+                            f"Event Name: {escape(event_name)}\n"
+                            f"Your Rating: {rating}/5\n"
+                            f"Your Comment: {escape(comment) if comment else 'No comment provided'}\n\n"
+                            f"Your feedback is valuable to us!\n\n"
+                            f"Best regards,\n"
+                            f"The Event Portal Team"
+                        )
+
+                        msg = Message(
+                            subject=msg_subject,
+                            recipients=[user_email],
+                            body=msg_body
+                        )
+
+                        # Pass the app context to the thread
+                        thread = Thread(target=send_async_email, args=[app.app_context(), msg])
+                        thread.start()
+                        app.logger.info(f"Initiated sending feedback confirmation email to {user_email} for EventID {event_id}.")
+
+                    except Exception as e:
+                        app.logger.error(f"Failed to initiate sending feedback confirmation email to {user_email} for EventID {event_id}: {str(e)}")
+                        # Log the error, but don't interrupt the user flow
+
+
+                    flash("Feedback submitted successfully! A confirmation email has been sent.", 'success')
+                    return redirect('/my-registrations')
+
                 except mysql.connector.Error as err:
-                    conn.rollback()
+                    conn.rollback() # Rollback the potential INSERT/UPDATE if it failed
                     flash(f"Failed to save feedback: {err}", 'error')
+                    app.logger.error(f"Database error saving feedback for UserID {session['user_id']} EventID {event_id}: {err}", exc_info=True)
+                    return redirect(f'/submit-feedback/{event_id}')
+                except Exception as e:
+                    conn.rollback() # Rollback on unexpected errors
+                    flash(f"An unexpected error occurred while saving feedback.", 'error')
+                    app.logger.error(f"Unexpected error saving feedback for UserID {session['user_id']} EventID {event_id}: {e}", exc_info=True)
                     return redirect(f'/submit-feedback/{event_id}')
 
+
             # GET request - show form
+            # This part remains largely the same, but uses event_user_data for event info
+            # Need to re-fetch existing feedback as the first query only got event/user data
             cursor.execute("""
-                SELECT Rating, Comment FROM Feedback 
+                SELECT Rating, Comment FROM Feedback
                 WHERE UserID = %s AND EventID = %s
             """, (session['user_id'], event_id))
-            existing_feedback = cursor.fetchone()
-        
+            existing_feedback = cursor.fetchone() # Use fetchone as it's dictionary=True cursor
+
+
+            # Pass correct variables to template
             return render_template(
                 'feedback_form.html',
-                event=event_data,
+                event_name=event_name, # Pass event name explicitly
+                event_id=event_id, # Pass event_id for form action
                 existing_feedback=existing_feedback,
                 deadline=feedback_deadline.strftime('%Y-%m-%d %H:%M:%S')
             )
 
     except mysql.connector.Error as err:
         flash(f"Database error: {err}", 'error')
+        app.logger.error(f"Database error in submit_feedback route for UserID {session.get('user_id')} EventID {event_id}: {err}", exc_info=True)
         return redirect('/my-registrations')
     except Exception as e:
         flash(f"Unexpected error: {str(e)}", 'error')
+        app.logger.error(f"Unexpected error in submit_feedback route for UserID {session.get('user_id')} EventID {event_id}: {e}", exc_info=True)
         return redirect('/my-registrations')
+
     finally:
-        if conn.is_connected():
+        if conn and conn.is_connected():
             conn.close()
 
 @app.route('/event-feedback/<int:event_id>')
