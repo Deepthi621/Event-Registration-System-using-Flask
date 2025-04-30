@@ -399,32 +399,22 @@ CREATE TABLE ReportPhotos (
     FOREIGN KEY (ReportID) REFERENCES Reports(ReportID) ON DELETE CASCADE
 );
 DELETE FROM Reports
-WHERE ReportID = 3;
+WHERE ReportID = 6;
 
+Select * from Reports;
+Drop table Certificates;
+USE EventRegistrationDB;
 
+DELETE Payments 
+FROM Payments
+JOIN Registrations ON Payments.RegistrationID = Registrations.RegistrationID
+WHERE Registrations.UserID = 16;
 
+DELETE FROM Registrations
+WHERE UserID = 16;
 
+DELETE FROM Events
+WHERE OrganizerID = 16;
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+DELETE FROM Users
+WHERE UserID = 16;
