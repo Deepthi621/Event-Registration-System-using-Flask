@@ -5,11 +5,12 @@ from datetime import datetime, date, time
 import os
 import re
 from threading import Thread # Import Thread
-from flask_mail import Mail, Message
+from flask_mail import Mail, Message ,Attachment
 # import smtplib # Not strictly needed if using Flask-Mail
 from markupsafe import escape
 import logging
 from logging.handlers import RotatingFileHandler
+import mimetypes
 
 handler = RotatingFileHandler('app.log', maxBytes=10000, backupCount=3)
 handler.setLevel(logging.DEBUG)
@@ -34,6 +35,8 @@ app.config['MAIL_PASSWORD'] = 'tcssykfzmkyspleh'  # Use environment variable and
 app.config['MAIL_DEFAULT_SENDER'] = ('Event Portal', 'bhavanabc05@gmail.com') # Use MAIL_DEFAULT_SENDER
 mail = Mail(app)
 
+LOGO_FILENAME='event_logo.avif'
+LOGO_PATH = os.path.join(app.root_path, 'static', LOGO_FILENAME)
 
 def get_db_connection():
     try:
@@ -810,33 +813,128 @@ def payments():
 @app.route('/complete-payment/<int:payment_id>')
 def complete_payment(payment_id):
     if 'user_id' not in session or session.get('role') != 'Attendee':
+        flash("Please log in as an Attendee to complete payments.", 'warning')
         return redirect('/')
 
     conn = get_db_connection()
     if not conn:
         return redirect('/payments')
 
-    try:
-        with conn.cursor() as cursor:
-            cursor.execute("""
-                UPDATE Payments P
-                JOIN Registrations R ON P.RegistrationID = R.RegistrationID
-                SET P.Status = 'Completed'
-                WHERE P.PaymentID = %s AND R.UserID = %s AND P.Status = 'Pending' AND R.Status = 'Active'
-            """, (payment_id, session['user_id']))
+    # Variables to hold data for email, initialized to None
+    user_email = None
+    user_name = None
+    event_name = None
+    paid_amount = None
+    payment_success = False # Flag to indicate if payment update succeeded
 
-            if cursor.rowcount == 0:
-                flash("Payment not found or already completed", 'error')
+    try:
+        with conn.cursor(dictionary=True) as cursor: # Use dictionary=True for easier access
+            # First, retrieve necessary details for the email *and* for the update check
+            cursor.execute("""
+                SELECT
+                    P.PaymentID,
+                    P.Amount,
+                    P.Status AS PaymentStatus,
+                    E.EventName,
+                    U.Email,
+                    U.Name,
+                    R.Status AS RegistrationStatus
+                FROM Payments P
+                JOIN Registrations R ON P.RegistrationID = R.RegistrationID
+                JOIN Events E ON R.EventID = E.EventID
+                JOIN Users U ON R.UserID = U.UserID -- Join to get user details
+                WHERE P.PaymentID = %s AND R.UserID = %s
+                FOR UPDATE -- Lock these rows as we might update the payment
+            """, (payment_id, session['user_id']))
+            payment_details = cursor.fetchone()
+
+            if not payment_details:
+                flash("Payment record not found.", 'error')
+                conn.rollback() # Rollback the FOR UPDATE lock
+                return redirect('/payments')
+
+            # Check if payment is already completed or registration is not active
+            if payment_details['PaymentStatus'] != 'Pending' or payment_details['RegistrationStatus'] != 'Active':
+                 flash("Payment is not pending or registration is not active.", 'warning')
+                 conn.rollback() # Rollback the FOR UPDATE lock
+                 return redirect('/payments')
+
+            # Extract details for email
+            user_email = payment_details['Email']
+            user_name = payment_details['Name']
+            event_name = payment_details['EventName']
+            paid_amount = payment_details['Amount'] # Amount from the payment record
+
+
+            # Now perform the update
+            cursor.execute("""
+                UPDATE Payments
+                SET Status = 'Completed'
+                WHERE PaymentID = %s
+            """, (payment_id,))
+
+            # Check if the update affected exactly one row
+            if cursor.rowcount == 1:
+                 conn.commit()
+                 payment_success = True # Set flag to indicate success
+                 app.logger.info(f"Payment {payment_id} completed successfully by UserID {session['user_id']}.")
+                 flash("Payment completed successfully!", 'success')
             else:
-                conn.commit()
-                flash("Payment completed successfully!", 'success')
+                 # This case should theoretically not be hit if the SELECT FOR UPDATE worked correctly
+                 # but it's a safeguard.
+                 conn.rollback()
+                 app.logger.warning(f"Payment {payment_id} update failed or affected multiple/zero rows for UserID {session['user_id']}. Rolled back.")
+                 flash("Payment update failed. Please try again.", 'error')
+
 
     except mysql.connector.Error as err:
-        conn.rollback()
-        flash(f"Payment failed: {err}", 'error')
-    finally:
-        conn.close()
+        conn.rollback() # Ensure rollback on DB errors
+        flash(f"Payment failed due to a database error: {err}", 'error')
+        app.logger.error(f"Payment database error for PaymentID {payment_id}, UserID {session.get('user_id')}: {err}", exc_info=True)
+    except Exception as e:
+        conn.rollback() # Ensure rollback on unexpected errors
+        flash(f"An unexpected error occurred during payment.", 'error')
+        app.logger.error(f"Unexpected error during payment completion for PaymentID {payment_id}, UserID {session.get('user_id')}: {e}", exc_info=True)
 
+    finally:
+        if conn and conn.is_connected():
+            conn.close()
+
+    # --- Send Payment Confirmation Email (Asynchronously) ---
+    # Only send if the database update was successful and we have user/event details
+    if payment_success and user_email and user_name and event_name and paid_amount is not None:
+        try:
+            msg_subject = f"Payment Confirmed for: {escape(event_name)}"
+            msg_body = (
+                f"Hi {escape(user_name)},\n\n"
+                f"This email confirms your payment for the event registration:\n\n"
+                f"Event Name: {escape(event_name)}\n"
+                f"Amount Paid: {paid_amount:.2f}\n" # Format amount to 2 decimal places
+                f"Payment ID: {payment_id}\n\n"
+                f"Your registration is now fully confirmed.\n\n"
+                f"Thank you for your payment!\n\n"
+                f"Best regards,\n"
+                f"The Event Portal Team"
+            )
+
+            msg = Message(
+                subject=msg_subject,
+                recipients=[user_email],
+                body=msg_body
+            )
+
+            # Pass the app context to the thread
+            thread = Thread(target=send_async_email, args=[app.app_context(), msg])
+            thread.start()
+            app.logger.info(f"Initiated sending payment confirmation email to {user_email} for PaymentID {payment_id}.")
+
+        except Exception as e:
+            # Log the email sending error
+            app.logger.error(f"Failed to initiate sending payment confirmation email to {user_email} for PaymentID {payment_id}: {str(e)}")
+            # Note: We don't flash an error here because the payment itself was successful.
+            # The log is sufficient for this background task failure.
+
+    # Always redirect to the payments page after the attempt
     return redirect('/payments')
 
 
@@ -1227,6 +1325,52 @@ def view_feedback(event_id):
         return redirect('/dashboard')
     finally:
         conn.close()
+
+@app.route('/profile')
+def profile():
+    # Check if user is logged in
+    if 'user_id' not in session:
+        flash('Please log in to view your profile.', 'warning')
+        return redirect(url_for('login')) # Redirect to your login route
+
+    user_id = session['user_id']
+    user_data = None
+    conn = None
+    cursor = None
+
+    try:
+        # Get a database connection
+        conn = get_db_connection() # Replace with your actual connection function call
+        cursor = conn.cursor(dictionary=True) # Use dictionary=True to fetch rows as dictionaries
+
+        # Query the database for user information
+        # Based on your schema: UserID, Name, Email, Role
+        query = "SELECT UserID, Name, Email, Role FROM Users WHERE UserID = %s"
+        cursor.execute(query, (user_id,))
+        user_data = cursor.fetchone() # Fetch one row
+
+        if user_data:
+            # Render the profile template, passing the user data
+            return render_template('profile.html', user=user_data)
+        else:
+            # User ID in session but not found in DB (shouldn't happen with proper logic)
+            session.pop('user_id', None) # Clear session
+            flash('User not found. Please log in again.', 'danger')
+            return redirect(url_for('login'))
+
+    except Exception as e:
+        # Handle database errors
+        print(f"Database error: {e}")
+        flash('An error occurred while loading your profile.', 'danger')
+        # Optionally redirect or render an error page
+        return redirect(url_for('index')) # Redirect to home or login
+
+    finally:
+        # Close cursor and connection
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
 if __name__ == '__main__':
     if not os.path.exists(UPLOAD_FOLDER):
