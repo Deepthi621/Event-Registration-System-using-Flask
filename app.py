@@ -245,6 +245,7 @@ def dashboard():
                     SELECT E.EventName, 
                            U.Name AS attendee_name,
                            U.Email AS attendee_email,
+                           U.ProfilePhotoFilename,
                            COALESCE(P.Amount, 0) AS Amount,
                            COALESCE(P.Status, 'Pending') AS payment_status,
                            R.Status AS registration_status
@@ -1128,159 +1129,211 @@ def logout():
 
 @app.route('/submit-feedback/<int:event_id>', methods=['GET', 'POST'])
 def submit_feedback(event_id):
+    """Handles submitting feedback for an event."""
+    # Check if user is logged in and is an Attendee
     if 'user_id' not in session or session.get('role') != 'Attendee':
         flash("Please log in as an Attendee to submit feedback.", 'warning')
-        return redirect('/')
+        return redirect(url_for('home')) # Redirect to home or login page
 
     conn = get_db_connection()
     if not conn:
-        return redirect('/my-registrations')
+        # get_db_connection already flashes an error
+        return redirect(url_for('my_registrations')) # Redirect to a page listing registrations
 
     try:
+        # Use cursor(dictionary=True) for easier access to column names
         with conn.cursor(dictionary=True) as cursor:
-            # Get event details with time validation and user info
-            # Added U.Email, U.Name to the select list
+            # Get event details with time validation and user info (for email)
             cursor.execute("""
                 SELECT E.EventName, E.Date AS event_date, E.EndTime,
-                        TIMESTAMP(E.Date, E.EndTime) AS event_end,
-                        TIMESTAMP(E.Date, E.EndTime) + INTERVAL 48 HOUR AS feedback_deadline,
-                        U.Email, U.Name # Fetch user email and name here
+                       TIMESTAMP(E.Date, E.EndTime) AS event_end,
+                       TIMESTAMP(E.Date, E.EndTime) + INTERVAL 48 HOUR AS feedback_deadline,
+                       U.Email, U.Name  -- Fetch user email and name for the email
                 FROM Events E
                 JOIN Registrations R ON E.EventID = R.EventID
-                JOIN Users U ON R.UserID = U.UserID # Join to get user details
+                JOIN Users U ON R.UserID = U.UserID  -- Join to get user details
                 WHERE R.UserID = %s
                 AND E.EventID = %s
-                AND R.Status = 'Active'
+                AND R.Status = 'Active' -- Ensure the user is registered and active for this event
             """, (session['user_id'], event_id))
             event_user_data = cursor.fetchone()
 
+            # If no matching active registration found, the user cannot give feedback
             if not event_user_data:
                 flash("Invalid event or registration for feedback submission.", 'error')
-                return redirect('/my-registrations')
+                app.logger.warning(f"User {session['user_id']} attempted feedback for invalid/inactive event registration {event_id}")
+                return redirect(url_for('my_registrations'))
 
-            # Extract data including user info
+            # Extract necessary data including user info
             event_name = event_user_data['EventName']
             user_email = event_user_data['Email']
             user_name = event_user_data['Name']
 
-            # Convert database times to Python datetime objects
-            try:
-                event_end = event_user_data['event_end']
-                feedback_deadline = event_user_data['feedback_deadline']
-            except KeyError:
-                flash("Event time data is invalid.", 'error')
-                return redirect('/my-registrations')
+            # Convert database timestamps to Python datetime objects
+            # Use .get() with None as default just in case, though TIMESTAMP should return values
+            event_end = event_user_data.get('event_end')
+            feedback_deadline = event_user_data.get('feedback_deadline')
+
+            # Check for potential issues with timestamp calculations
+            if event_end is None or feedback_deadline is None:
+                 flash("Could not determine event completion time or feedback deadline.", 'error')
+                 app.logger.error(f"TIMESTAMP calculation returned NULL for EventID {event_id}. Check database data/functions.")
+                 return redirect(url_for('my_registrations'))
+
 
             current_time = datetime.now()
 
             # Check if event hasn't ended yet
             if current_time < event_end:
                 flash("This event has not yet completed. Feedback cannot be submitted yet.", 'warning')
-                return redirect('/my-registrations')
+                return redirect(url_for('my_registrations'))
 
             # Check if feedback window has expired
             if current_time > feedback_deadline:
                 flash("Feedback submission is only allowed within 48 hours after event completion.", 'error')
-                return redirect('/my-registrations')
+                return redirect(url_for('my_registrations'))
 
-            # Handle form submission (POST request)
+            # --- Handle form submission (POST request) ---
             if request.method == 'POST':
                 rating = request.form.get('rating')
                 comment = request.form.get('comment', '').strip()
 
+                # Basic validation for rating
                 if not rating or not rating.isdigit() or int(rating) not in range(1, 6):
                     flash("Please provide a valid rating (1-5).", 'error')
-                    return redirect(f'/submit-feedback/{event_id}')
+                    return redirect(url_for('submit_feedback', event_id=event_id))
+
+                # Convert rating to integer
+                rating = int(rating)
 
                 try:
-                    # We use a new cursor for the INSERT/UPDATE to avoid potential issues
-                    # with the dictionary=True cursor if needed, though it should be fine.
-                    # Explicitly creating a new one is safer if different cursor types/settings are used.
+                    # Use a new cursor for the INSERT/UPDATE operation for safety/clarity
+                    # Using default cursor (dictionary=False) here
                     with conn.cursor() as insert_cursor:
+                         # Use ON DUPLICATE KEY UPDATE as defined in your schema for Feedback
+                         # Assumes a UNIQUE constraint on (UserID, EventID) in the Feedback table
                         insert_cursor.execute("""
                             INSERT INTO Feedback (UserID, EventID, Rating, Comment)
                             VALUES (%s, %s, %s, %s)
                             ON DUPLICATE KEY UPDATE
-                            Rating = VALUES(Rating), Comment = VALUES(Comment)
+                            Rating = VALUES(Rating), Comment = VALUES(Comment),
+                            FeedbackDate = CURRENT_TIMESTAMP() -- Optional: update timestamp on change
                         """, (session['user_id'], event_id, rating, comment))
                         conn.commit()
-                        app.logger.info(f"Feedback submitted/updated by UserID {session['user_id']} for EventID {event_id}.")
+                        app.logger.info(f"Feedback submitted/updated by UserID {session['user_id']} for EventID {event_id}. Rating: {rating}")
 
 
-                    # --- Send Feedback Confirmation Email (Asynchronously) ---
+                    # --- Send Simplified Feedback Confirmation Email (Asynchronously) ---
+                    # This email just confirms receipt of feedback, without details or logo
                     try:
-                        msg_subject = f"Feedback Received for: {escape(event_name)}"
+                        # Use user_email and user_name fetched earlier
+                        msg_subject = f"Thank You For Your Feedback - {escape(event_name)}"
+
+                        # --- Create Simplified HTML and Plain Text Email Bodies ---
+                        msg_html = f"""
+                        <html>
+                        <head></head>
+                        <body>
+                            <p>Hi {escape(user_name)},</p>
+                            <p>Thank you for submitting your valuable feedback for the event: <strong>{escape(event_name)}</strong>.</p>
+                            <p>Your input helps us improve future events.</p>
+                            <p>Best regards,<br>The Event Portal Team</p>
+                        </body>
+                        </html>
+                        """
+
                         msg_body = (
                             f"Hi {escape(user_name)},\n\n"
-                            f"Thank you for providing feedback for the event:\n\n"
-                            f"Event Name: {escape(event_name)}\n"
-                            f"Your Rating: {rating}/5\n"
-                            f"Your Comment: {escape(comment) if comment else 'No comment provided'}\n\n"
-                            f"Your feedback is valuable to us!\n\n"
+                            f"Thank you for submitting your valuable feedback for the event: {escape(event_name)}.\n\n"
+                            f"Your input helps us improve future events.\n\n"
                             f"Best regards,\n"
                             f"The Event Portal Team"
                         )
 
+                        # Create the Message object
                         msg = Message(
                             subject=msg_subject,
-                            recipients=[user_email],
-                            body=msg_body
+                            recipients=[user_email], # Send to the user's email
+                            body=msg_body, # Set the plain text body
+                            html=msg_html  # Set the HTML body
                         )
 
-                        # Pass the app context to the thread
+                        # --- NO LOGO ATTACHMENT IN THIS EMAIL as requested ---
+                        # The code to attach the logo is intentionally omitted here.
+
+                        # Pass the created Message object to the async sender
                         thread = Thread(target=send_async_email, args=[app.app_context(), msg])
                         thread.start()
-                        app.logger.info(f"Initiated sending feedback confirmation email to {user_email} for EventID {event_id}.")
+                        app.logger.info(f"Initiated sending simplified feedback confirmation email to {user_email} for EventID {event_id}.")
 
                     except Exception as e:
-                        app.logger.error(f"Failed to initiate sending feedback confirmation email to {user_email} for EventID {event_id}: {str(e)}")
-                        # Log the error, but don't interrupt the user flow
+                        # Log the error initiating the email sending process
+                        app.logger.error(f"Failed to initiate sending simplified feedback confirmation email to {user_email} for EventID {event_id}: {str(e)}", exc_info=True)
+                        # No flash message needed here, as feedback was saved successfully.
 
 
                     flash("Feedback submitted successfully! A confirmation email has been sent.", 'success')
-                    return redirect('/my-registrations')
+                    return redirect(url_for('my_registrations')) # Redirect after successful POST
 
+                except mysql.connector.IntegrityError as err:
+                     # This might catch duplicate feedback if ON DUPLICATE KEY UPDATE didn't work as expected,
+                     # or other integrity errors.
+                     conn.rollback()
+                     flash(f"Failed to save feedback due to an integrity error (e.g., duplicate): {err}", 'error')
+                     app.logger.error(f"Database integrity error saving feedback for UserID {session['user_id']} EventID {event_id}: {err}", exc_info=True)
+                     return redirect(url_for('submit_feedback', event_id=event_id)) # Use url_for
                 except mysql.connector.Error as err:
                     conn.rollback() # Rollback the potential INSERT/UPDATE if it failed
-                    flash(f"Failed to save feedback: {err}", 'error')
+                    flash(f"Failed to save feedback due to a database error: {err}", 'error')
                     app.logger.error(f"Database error saving feedback for UserID {session['user_id']} EventID {event_id}: {err}", exc_info=True)
-                    return redirect(f'/submit-feedback/{event_id}')
+                    return redirect(url_for('submit_feedback', event_id=event_id)) # Use url_for
                 except Exception as e:
-                    conn.rollback() # Rollback on unexpected errors
+                    conn.rollback() # Ensure rollback on unexpected errors during save/email init
                     flash(f"An unexpected error occurred while saving feedback.", 'error')
                     app.logger.error(f"Unexpected error saving feedback for UserID {session['user_id']} EventID {event_id}: {e}", exc_info=True)
-                    return redirect(f'/submit-feedback/{event_id}')
+                    return redirect(url_for('submit_feedback', event_id=event_id)) # Use url_for
 
 
-            # GET request - show form
-            # This part remains largely the same, but uses event_user_data for event info
-            # Need to re-fetch existing feedback as the first query only got event/user data
+            # --- Handle GET request - show form ---
+            # This block executes if the request method is GET.
+            # The initial query using cursor(dictionary=True) has already fetched event_user_data
+            # and validated the user/event/time window.
+
+            # Fetch existing feedback specifically for displaying the form fields if user is updating
+            # Reuse the same dictionary=True cursor within the `with` block
             cursor.execute("""
                 SELECT Rating, Comment FROM Feedback
                 WHERE UserID = %s AND EventID = %s
             """, (session['user_id'], event_id))
-            existing_feedback = cursor.fetchone() # Use fetchone as it's dictionary=True cursor
+            existing_feedback = cursor.fetchone() # Use fetchone as cursor is dictionary=True
 
-
-            # Pass correct variables to template
+            # Pass data to the template for rendering the form
+            # Pass the original fetched data dictionary 'event_user_data' as 'event' to the template
+            # This resolves the 'event' is undefined error in the template
             return render_template(
                 'feedback_form.html',
-                event_name=event_name, # Pass event name explicitly
-                event_id=event_id, # Pass event_id for form action
-                existing_feedback=existing_feedback,
+                event=event_user_data, # <-- Pass the dictionary here as 'event'
+                # You can still pass specific values too if your template uses them directly
+                event_name=event_name, # Convenient for template access
+                event_id=event_id,     # Convenient for template action URLs
+                existing_feedback=existing_feedback, # Pass existing feedback data
+                # Pass the deadline as a formatted string for display in the template
                 deadline=feedback_deadline.strftime('%Y-%m-%d %H:%M:%S')
             )
 
     except mysql.connector.Error as err:
-        flash(f"Database error: {err}", 'error')
-        app.logger.error(f"Database error in submit_feedback route for UserID {session.get('user_id')} EventID {event_id}: {err}", exc_info=True)
-        return redirect('/my-registrations')
+        # Handle database errors from the initial SELECT query or other DB ops before POST block
+        flash(f"Database error accessing event details: {err}", 'error')
+        app.logger.error(f"Database error in submit_feedback route (initial fetch/validation) for UserID {session.get('user_id')} EventID {event_id}: {err}", exc_info=True)
+        return redirect(url_for('my_registrations'))
     except Exception as e:
-        flash(f"Unexpected error: {str(e)}", 'error')
-        app.logger.error(f"Unexpected error in submit_feedback route for UserID {session.get('user_id')} EventID {event_id}: {e}", exc_info=True)
-        return redirect('/my-registrations')
+        # Handle any other unexpected errors from the initial part of the route before POST block
+        flash(f"An unexpected error occurred retrieving event details: {str(e)}", 'error')
+        app.logger.error(f"Unexpected error in submit_feedback route (initial fetch/validation) for UserID {session.get('user_id')} EventID {event_id}: {e}", exc_info=True)
+        return redirect(url_for('my_registrations'))
 
     finally:
+        # Ensure the database connection is closed in all cases
         if conn and conn.is_connected():
             conn.close()
 
@@ -1326,50 +1379,175 @@ def view_feedback(event_id):
     finally:
         conn.close()
 
+STATIC_PROFILE_PHOTOS_FOLDER = 'static/profile_photos'
+PROFILE_PHOTOS_FOLDER = os.path.join(app.root_path, STATIC_PROFILE_PHOTOS_FOLDER)
+
+os.makedirs(PROFILE_PHOTOS_FOLDER, exist_ok=True)
+app.logger.info(f"Profile photos upload path set to: {PROFILE_PHOTOS_FOLDER}")
+
+ALLOWED_PROFILE_PHOTO_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+app.logger.info(f"Allowed profile photo extensions: {ALLOWED_PROFILE_PHOTO_EXTENSIONS}")
+
+def allowed_profile_photo(filename):
+    """Checks if a profile photo filename has an allowed extension."""
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_PROFILE_PHOTO_EXTENSIONS
+
+# --- Route to Display User Profile ---
 @app.route('/profile')
 def profile():
-    # Check if user is logged in
+    """Displays the logged-in user's profile."""
+    # Ensure user is logged in
     if 'user_id' not in session:
-        flash('Please log in to view your profile.', 'warning')
+        flash("Please log in to view your profile.", "warning")
         return redirect(url_for('login')) # Redirect to your login route
 
-    user_id = session['user_id']
-    user_data = None
-    conn = None
-    cursor = None
+    conn = get_db_connection()
+    if not conn:
+        return redirect(url_for('dashboard')) # Redirect somewhere appropriate if DB fails
 
+    user = None
     try:
-        # Get a database connection
-        conn = get_db_connection() # Replace with your actual connection function call
-        cursor = conn.cursor(dictionary=True) # Use dictionary=True to fetch rows as dictionaries
+        with conn.cursor(dictionary=True) as cursor:
+            # Fetch user details, including the profile photo filename
+            cursor.execute("SELECT UserID, Name, Email, Role, ProfilePhotoFilename FROM Users WHERE UserID = %s", (session['user_id'],))
+            user = cursor.fetchone()
 
-        # Query the database for user information
-        # Based on your schema: UserID, Name, Email, Role
-        query = "SELECT UserID, Name, Email, Role FROM Users WHERE UserID = %s"
-        cursor.execute(query, (user_id,))
-        user_data = cursor.fetchone() # Fetch one row
-
-        if user_data:
+        if user:
             # Render the profile template, passing the user data
-            return render_template('profile.html', user=user_data)
+            return render_template('profile.html', user=user)
         else:
-            # User ID in session but not found in DB (shouldn't happen with proper logic)
-            session.pop('user_id', None) # Clear session
-            flash('User not found. Please log in again.', 'danger')
-            return redirect(url_for('login'))
+            # This case should theoretically not happen if session['user_id'] is valid
+            flash("User not found.", "error")
+            return redirect(url_for('dashboard')) # Or logout
 
+    except mysql.connector.Error as err:
+        flash(f"Database error fetching profile: {err}", 'error')
+        app.logger.error(f"Database error fetching profile for UserID {session['user_id']}: {err}", exc_info=True)
+        return redirect(url_for('dashboard'))
     except Exception as e:
-        # Handle database errors
-        print(f"Database error: {e}")
-        flash('An error occurred while loading your profile.', 'danger')
-        # Optionally redirect or render an error page
-        return redirect(url_for('index')) # Redirect to home or login
-
+        flash(f"An unexpected error occurred: {str(e)}", 'error')
+        app.logger.error(f"Unexpected error fetching profile for UserID {session['user_id']}: {e}", exc_info=True)
+        return redirect(url_for('dashboard'))
     finally:
-        # Close cursor and connection
-        if cursor:
-            cursor.close()
-        if conn:
+        if conn and conn.is_connected():
+            conn.close()
+
+# --- Route to Edit User Profile (GET and POST) ---
+@app.route('/edit-profile', methods=['GET', 'POST'])
+def edit_profile():
+    """Displays form to edit profile and handles profile photo upload."""
+    # Ensure user is logged in
+    if 'user_id' not in session:
+        flash("Please log in to edit your profile.", "warning")
+        return redirect(url_for('login'))
+
+    conn = get_db_connection()
+    if not conn:
+        return redirect(url_for('profile')) # Redirect back to profile if DB fails
+
+    user = None
+    try:
+        with conn.cursor(dictionary=True) as cursor:
+            # Fetch user details
+            cursor.execute("SELECT UserID, Name, Email, Role, ProfilePhotoFilename FROM Users WHERE UserID = %s", (session['user_id'],))
+            user = cursor.fetchone()
+
+        if not user:
+            # Should not happen if session is valid, but good check
+            flash("User not found.", "error")
+            return redirect(url_for('profile'))
+
+        if request.method == 'POST':
+            # --- Handle Profile Photo Upload ---
+            # Check if the post request has the file part
+            if 'profile_photo' not in request.files:
+                flash('No file part in the request.', 'warning')
+                # Continue processing other form data if any, or return to form
+                # For now, let's assume photo is optional and proceed
+                pass # No photo uploaded, just skip photo processing
+
+            else:
+                file = request.files['profile_photo']
+
+                # If user does not select a file, browser submits an empty file without a filename
+                if file.filename == '':
+                    # User didn't select a new file, might be saving other profile details
+                    # flash('No selected file.', 'warning') # Or maybe just informational
+                    pass # No new photo uploaded
+
+                # Process the uploaded file
+                elif file and allowed_profile_photo(file.filename):
+                    try:
+                        # Generate a secure filename to prevent directory traversal attacks
+                        filename = secure_filename(file.filename)
+                        # Create a unique filename to avoid overwriting existing files
+                        # Could add a timestamp or UUID: filename = f"{uuid.uuid4()}_{filename}"
+                        # For simplicity, let's use UserID to name the photo file
+                        # You might want to handle different extensions if needed
+                        file_extension = filename.rsplit('.', 1)[1].lower()
+                        photo_filename_in_db = f"{session['user_id']}.{file_extension}"
+                        file_path = os.path.join(PROFILE_PHOTOS_FOLDER, photo_filename_in_db)
+
+                        # Save the file
+                        file.save(file_path)
+                        app.logger.info(f"Saved profile photo for UserID {session['user_id']} as {photo_filename_in_db}")
+
+                        # Update the database with the new filename
+                        with conn.cursor() as cursor:
+                            cursor.execute("UPDATE Users SET ProfilePhotoFilename = %s WHERE UserID = %s", (photo_filename_in_db, session['user_id']))
+                            conn.commit()
+                        flash("Profile photo updated successfully!", "success")
+
+                    except Exception as file_upload_error:
+                         conn.rollback() # Rollback potential DB changes if update failed after save
+                         flash(f"Error uploading profile photo: {str(file_upload_error)}", "error")
+                         app.logger.error(f"Error uploading profile photo for UserID {session['user_id']}: {file_upload_error}", exc_info=True)
+
+
+                else:
+                    # File is not allowed
+                    flash('Allowed photo types are: png, jpg, jpeg, gif.', 'error')
+                    # Return to the form so user can try again
+                    return redirect(url_for('edit_profile')) # Stay on the edit page
+
+            # --- Handle Other Profile Fields (if your form allows editing Name, etc.) ---
+            # Example:
+            # new_name = request.form.get('name')
+            # if new_name and new_name != user['Name']:
+            #     try:
+            #         with conn.cursor() as cursor:
+            #              cursor.execute("UPDATE Users SET Name = %s WHERE UserID = %s", (new_name, session['user_id']))
+            #              conn.commit()
+            #         flash("Name updated successfully!", "success")
+            #     except mysql.connector.Error as err:
+            #          conn.rollback()
+            #          flash(f"Error updating name: {err}", "error")
+            #          app.logger.error(f"DB error updating name for UserID {session['user_id']}: {err}")
+            #     except Exception as e:
+            #          conn.rollback()
+            #          flash(f"Unexpected error updating name: {str(e)}", "error")
+            #          app.logger.error(f"Unexpected error updating name for UserID {session['user_id']}: {e}")
+
+
+            # After processing POST, redirect back to the profile page to see changes
+            return redirect(url_for('profile'))
+
+        # --- Handle GET Request ---
+        # Render the edit profile form, passing user data to pre-fill
+        return render_template('edit_profile.html', user=user)
+
+    except mysql.connector.Error as err:
+        flash(f"Database error: {err}", 'error')
+        app.logger.error(f"Database error in edit_profile route for UserID {session.get('user_id')}: {err}", exc_info=True)
+        return redirect(url_for('profile'))
+    except Exception as e:
+        flash(f"An unexpected error occurred: {str(e)}", 'error')
+        app.logger.error(f"Unexpected error in edit_profile route for UserID {session.get('user_id')}: {e}", exc_info=True)
+        return redirect(url_for('profile'))
+    finally:
+        # Ensure the connection is closed
+        if conn and conn.is_connected():
             conn.close()
 
 if __name__ == '__main__':

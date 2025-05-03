@@ -1,0 +1,109 @@
+2025-04-28 23:11:50,054 - app - DEBUG - Attempting to send welcome email to bcbhavana233@gmail.com
+2025-04-28 23:11:52,420 - app - ERROR - Email delivery failed: 'NoneType' object is not callable
+Traceback (most recent call last):
+  File "C:\Users\bcbha\OneDrive\Desktop\EVENT\app.py", line 123, in register_user
+    if not mail.validate(email):
+           ^^^^^^^^^^^^^^^^^^^^
+TypeError: 'NoneType' object is not callable
+2025-04-29 19:05:52,351 - app - INFO - User bcbhavana233@gmail.com registered successfully.
+2025-04-29 19:05:52,360 - app - ERROR - Failed to send welcome email to bcbhavana233@gmail.com: [Errno 11001] getaddrinfo failed
+2025-04-29 19:12:31,674 - app - INFO - User bcbhavana233@gmail.com registered successfully.
+2025-04-29 19:12:36,637 - app - INFO - Welcome email sent successfully to bcbhavana233@gmail.com
+2025-04-29 19:22:27,318 - app - INFO - User 2023cs_deepthip_a@nie.ac.in registered successfully.
+2025-04-29 19:22:31,713 - app - INFO - Welcome email sent successfully to 2023cs_deepthip_a@nie.ac.in
+2025-04-29 19:23:13,158 - app - INFO - User 2023cs_deekshapriyaca_a@nie.ac.in registered successfully.
+2025-04-29 19:23:18,594 - app - INFO - Welcome email sent successfully to 2023cs_deekshapriyaca_a@nie.ac.in
+2025-04-29 19:25:13,895 - app - INFO - User 2023cs_bhavanabc_a@nie.ac.in registered successfully.
+2025-04-29 19:25:18,130 - app - INFO - Welcome email sent successfully to 2023cs_bhavanabc_a@nie.ac.in
+2025-04-29 19:38:10,976 - app - ERROR - Registration database error for UserID 31 EventID 1: 1054 (42S22): Unknown column 'Title' in 'field list'
+Traceback (most recent call last):
+  File "C:\Users\bcbha\OneDrive\Desktop\EVENT\.venv\Lib\site-packages\mysql\connector\connection_cext.py", line 755, in cmd_query
+    self._cmysql.query(
+_mysql_connector.MySQLInterfaceError: Unknown column 'Title' in 'field list'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\bcbha\OneDrive\Desktop\EVENT\app.py", line 636, in register_event
+    cursor.execute("""
+  File "C:\Users\bcbha\OneDrive\Desktop\EVENT\.venv\Lib\site-packages\mysql\connector\cursor_cext.py", line 351, in execute
+    self._connection.cmd_query(
+  File "C:\Users\bcbha\OneDrive\Desktop\EVENT\.venv\Lib\site-packages\mysql\connector\opentelemetry\context_propagation.py", line 97, in wrapper
+    return method(cnx, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bcbha\OneDrive\Desktop\EVENT\.venv\Lib\site-packages\mysql\connector\connection_cext.py", line 763, in cmd_query
+    raise get_mysql_exception(
+mysql.connector.errors.ProgrammingError: 1054 (42S22): Unknown column 'Title' in 'field list'
+2025-04-29 19:45:07,834 - app - INFO - User 31 created registration 63 for EventID 1.
+2025-04-29 19:45:07,838 - app - INFO - Created payment record 35 for registration 63 with amount 150.0.
+2025-04-29 19:45:07,854 - app - INFO - Transaction committed for registration 63, capacity updated for EventID 1.
+2025-04-29 19:45:07,860 - app - INFO - Retrieved user email 2023cs_bhavanabc_a@nie.ac.in for confirmation.
+2025-04-29 19:45:07,870 - app - INFO - Initiated sending registration confirmation email for RegistrationID 63 to 2023cs_bhavanabc_a@nie.ac.in.
+2025-04-29 19:45:12,800 - app - INFO - Welcome email sent successfully to 2023cs_bhavanabc_a@nie.ac.in
+2025-04-29 20:04:27,693 - app - INFO - User 31 created registration 64 for EventID 11.
+2025-04-29 20:04:27,701 - app - INFO - Created payment record 36 for registration 64 with amount 50.0.
+2025-04-29 20:04:27,727 - app - INFO - Transaction committed for registration 64, capacity updated for EventID 11.
+2025-04-29 20:04:27,735 - app - INFO - Retrieved user email 2023cs_bhavanabc_a@nie.ac.in for confirmation.
+2025-04-29 20:04:27,759 - app - INFO - Initiated sending registration confirmation email for RegistrationID 64 to 2023cs_bhavanabc_a@nie.ac.in.
+2025-04-29 20:04:32,694 - app - INFO - Welcome email sent successfully to 2023cs_bhavanabc_a@nie.ac.in
+2025-04-29 20:04:47,090 - app - ERROR - Cancellation database error for registration 64: 1054 (42S22): Unknown column 'E.UserID' in 'on clause'
+Traceback (most recent call last):
+  File "C:\Users\bcbha\OneDrive\Desktop\EVENT\.venv\Lib\site-packages\mysql\connector\connection_cext.py", line 755, in cmd_query
+    self._cmysql.query(
+_mysql_connector.MySQLInterfaceError: Unknown column 'E.UserID' in 'on clause'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\bcbha\OneDrive\Desktop\EVENT\app.py", line 926, in cancel_registration
+    cursor.execute("""
+  File "C:\Users\bcbha\OneDrive\Desktop\EVENT\.venv\Lib\site-packages\mysql\connector\cursor_cext.py", line 351, in execute
+    self._connection.cmd_query(
+  File "C:\Users\bcbha\OneDrive\Desktop\EVENT\.venv\Lib\site-packages\mysql\connector\opentelemetry\context_propagation.py", line 97, in wrapper
+    return method(cnx, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\bcbha\OneDrive\Desktop\EVENT\.venv\Lib\site-packages\mysql\connector\connection_cext.py", line 763, in cmd_query
+    raise get_mysql_exception(
+mysql.connector.errors.ProgrammingError: 1054 (42S22): Unknown column 'E.UserID' in 'on clause'
+2025-04-29 20:08:14,480 - app - INFO - Registration 64 cancelled successfully.
+2025-04-29 20:08:14,491 - app - INFO - Initiated sending cancellation confirmation email to 2023cs_bhavanabc_a@nie.ac.in for registration 64.
+2025-04-29 20:08:23,530 - app - INFO - Welcome email sent successfully to 2023cs_bhavanabc_a@nie.ac.in
+2025-04-30 15:45:44,303 - app - INFO - User 30 created registration 65 for EventID 1.
+2025-04-30 15:45:44,318 - app - INFO - Created payment record 37 for registration 65 with amount 150.0.
+2025-04-30 15:45:44,339 - app - INFO - Transaction committed for registration 65, capacity updated for EventID 1.
+2025-04-30 15:45:44,349 - app - INFO - Retrieved user email 2023cs_deekshapriyaca_a@nie.ac.in for confirmation.
+2025-04-30 15:45:44,425 - app - INFO - Initiated sending registration confirmation email for RegistrationID 65 to 2023cs_deekshapriyaca_a@nie.ac.in.
+2025-04-30 15:45:50,010 - app - INFO - Welcome email sent successfully to 2023cs_deekshapriyaca_a@nie.ac.in
+2025-04-30 15:46:09,983 - app - INFO - User 30 created registration 66 for EventID 12.
+2025-04-30 15:46:09,989 - app - INFO - Created payment record 38 for registration 66 with amount 50.0.
+2025-04-30 15:46:10,003 - app - INFO - Transaction committed for registration 66, capacity updated for EventID 12.
+2025-04-30 15:46:10,016 - app - INFO - Retrieved user email 2023cs_deekshapriyaca_a@nie.ac.in for confirmation.
+2025-04-30 15:46:10,050 - app - INFO - Initiated sending registration confirmation email for RegistrationID 66 to 2023cs_deekshapriyaca_a@nie.ac.in.
+2025-04-30 15:46:14,250 - app - INFO - Welcome email sent successfully to 2023cs_deekshapriyaca_a@nie.ac.in
+2025-04-30 15:51:51,763 - app - INFO - User 29 created registration 67 for EventID 1.
+2025-04-30 15:51:51,770 - app - INFO - Created payment record 39 for registration 67 with amount 150.0.
+2025-04-30 15:51:51,788 - app - INFO - Transaction committed for registration 67, capacity updated for EventID 1.
+2025-04-30 15:51:51,795 - app - INFO - Retrieved user email 2023cs_deepthip_a@nie.ac.in for confirmation.
+2025-04-30 15:51:51,820 - app - INFO - Initiated sending registration confirmation email for RegistrationID 67 to 2023cs_deepthip_a@nie.ac.in.
+2025-04-30 15:52:02,974 - app - ERROR - Failed to send welcome email to 2023cs_deepthip_a@nie.ac.in: [Errno 11001] getaddrinfo failed
+2025-04-30 15:55:36,241 - app - INFO - User 31 created registration 68 for EventID 7.
+2025-04-30 15:55:36,250 - app - INFO - Created payment record 40 for registration 68 with amount 50.0.
+2025-04-30 15:55:36,270 - app - INFO - Transaction committed for registration 68, capacity updated for EventID 7.
+2025-04-30 15:55:36,275 - app - INFO - Retrieved user email 2023cs_bhavanabc_a@nie.ac.in for confirmation.
+2025-04-30 15:55:36,300 - app - INFO - Initiated sending registration confirmation email for RegistrationID 68 to 2023cs_bhavanabc_a@nie.ac.in.
+2025-04-30 15:55:39,906 - app - INFO - Payment 40 completed successfully by UserID 31.
+2025-04-30 15:55:39,939 - app - INFO - Initiated sending payment confirmation email to 2023cs_bhavanabc_a@nie.ac.in for PaymentID 40.
+2025-04-30 15:55:40,357 - app - INFO - Welcome email sent successfully to 2023cs_bhavanabc_a@nie.ac.in
+2025-04-30 15:55:43,937 - app - INFO - Welcome email sent successfully to 2023cs_bhavanabc_a@nie.ac.in
+2025-04-30 16:18:50,023 - app - INFO - User bhavanabc521@gmail.com registered successfully.
+2025-04-30 16:18:50,415 - app - ERROR - Failed to attach logo 'event_logo.avif' to welcome email: The 'data' argument is required.
+2025-04-30 16:18:50,423 - app - INFO - Initiated sending welcome email to bhavanabc521@gmail.com.
+2025-04-30 16:18:55,322 - app - INFO - Welcome email sent successfully to bhavanabc521@gmail.com
+2025-04-30 16:26:54,513 - app - INFO - User bhavanabc521@gmail.com registered successfully.
+2025-04-30 16:26:59,575 - app - INFO - Welcome email sent successfully to bhavanabc521@gmail.com
+2025-04-30 16:27:07,682 - app - INFO - User 33 created registration 69 for EventID 1.
+2025-04-30 16:27:07,691 - app - INFO - Created payment record 41 for registration 69 with amount 150.0.
+2025-04-30 16:27:07,704 - app - INFO - Transaction committed for registration 69, capacity updated for EventID 1.
+2025-04-30 16:27:07,712 - app - INFO - Retrieved user email bhavanabc521@gmail.com for confirmation.
+2025-04-30 16:27:07,743 - app - INFO - Initiated sending registration confirmation email for RegistrationID 69 to bhavanabc521@gmail.com.
+2025-04-30 16:27:11,991 - app - INFO - Payment 41 completed successfully by UserID 33.

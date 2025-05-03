@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Edit Profile</title>
+    {# Use the same Bootstrap version as profile.html #}
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    {# Link to your custom CSS file if you have one (as commented out in profile.html) #}
+    {# <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}"> #}
+
+    <style>
+    /* Unified Style Matching profile.html */
+    body {
+      margin: 0;
+      /* Use Fredoka or a fallback font */
+      font-family: 'Fredoka', sans-serif;
+      background: #fdfbfb; /* Match background color */
+      position: relative;
+      overflow-x: hidden;
+      min-height: 100vh;
+    }
+    body::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: url('https://www.transparenttextures.com/patterns/stardust.png') repeat; /* Match background texture */
+      opacity: 0.3; /* Match opacity */
+      pointer-events: none;
+      z-index: 0;
+      animation: shimmer 4s linear infinite; /* Match shimmer animation */
+    }
+    @keyframes shimmer {
+      from { background-position: 0 0; }
+      to { background-position: 100% 100%; }
+    }
+    .container, .navbar, footer {
+      position: relative;
+      z-index: 1;
+    }
+    /* Navbar styles */
+    .navbar {
+      background-color: #ff6f61; /* Match navbar background */
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1); /* Match box shadow */
+    }
+    .navbar-brand {
+      font-size: 2rem;
+      font-weight: bold;
+      color: #fff !important; /* Match brand color */
+      letter-spacing: 1px; /* Match letter spacing */
+    }
+
+     /* Form Container Style (Matching profile-card/form-container idea) */
+     /* Applying styles similar to .profile-card for the form area */
+    .form-container {
+      background-color: #ffffff; /* Match background color */
+      padding: 2rem; /* Match padding */
+      border-radius: 1rem; /* Match border radius */
+      box-shadow: 0 10px 20px rgba(0,0,0,0.1); /* Match box shadow */
+      transition: transform 0.3s ease; /* Match hover effect */
+       max-width: 600px; /* Limit form width */
+       margin: 2rem auto; /* Center the form */
+    }
+    .form-container:hover {
+      transform: translateY(-5px); /* Match hover effect */
+    }
+
+     /* Profile Photo Preview Style for Edit Page */
+    .profile-photo-edit {
+        width: 100px; /* Smaller size for edit form */
+        height: 100px;
+        border-radius: 50%; /* Makes the photo round */
+        object-fit: cover; /* Ensures the photo covers the area without stretching */
+        border: 3px solid #ff6f61; /* Optional border matching theme */
+        margin-bottom: 1rem;
+        display: block; /* Make it a block element */
+        margin-left: auto; /* Center the photo */
+        margin-right: auto; /* Center the photo */
+    }
+
+    /* Button styles */
+    .btn-primary {
+      background-color: #ff6f61; /* Match primary button color */
+      border: none;
+      font-weight: bold;
+    }
+    .btn-primary:hover {
+      background-color: #e85a4f; /* Match primary button hover color */
+    }
+     
+
+     /* Ensure flash messages are styled */
+     .alert {
+        margin-top: 1rem; /* Space above alerts */
+        /* Add other alert styling from profile.html if needed */
+     }
+
+     /* Add Fredoka font link if needed */
+     /* This should ideally be a <link> tag, not in <style> */
+     /* <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet"> */
+    </style>
+    {# Link to Fredoka font - Place this outside the style tag #}
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+<nav class="navbar navbar-expand-lg navbar-dark">
+    <div class="container">
+        <a class="navbar-brand" href="{{ url_for('home') }}">EventHub</a>
+        <div class="d-flex">
+            {# Use url_for for all links #}
+            <a href="{{ url_for('dashboard') }}" class="btn btn-outline-light me-2">Dashboard</a>
+             <a href="{{ url_for('my_registrations') }}" class="btn btn-outline-light me-2">My Registrations</a>
+            <a href="{{ url_for('profile') }}" class="btn btn-outline-light me-2">Profile</a> {# Link back to profile #}
+            {# Assuming you have a logout route #}
+            <a href="{{ url_for('logout') }}" class="btn btn-danger">Logout</a>
+        </div>
+    </div>
+</nav>
+
+{# Use container with margin-top #}
+<div class="container mt-4">
+    {# Apply form-container styling #}
+    <div class="form-container">
+        <h2 class="text-center mb-4">Edit Profile</h2>
+
+        {# Flash Messages #}
+        {# Centered flash messages like in profile.html #}
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="row justify-content-center">
+                    {# Use col-md-12 or col-md-6 depending on desired width #}
+                    <div class="col-md-12">
+                     {% for category, message in messages %}
+                         <div class="alert alert-{{ category }} alert-dismissible fade show mt-3" role="alert">
+                             {{ message }}
+                             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                         </div>
+                     {% endfor %}
+                    </div>
+                </div>
+            {% endif %}
+        {% endwith %}
+
+
+        {# IMPORTANT: enctype="multipart/form-data" is required for file uploads #}
+        <form method="POST" enctype="multipart/form-data" action="{{ url_for('edit_profile') }}" class="mt-4"> {# Add mt-4 #}
+
+            <div class="mb-3 text-center"> {# Center the content #}
+                 <label class="form-label">Current Profile Photo:</label>
+                 <div>
+                    {# Use url_for for static files #}
+                    {# Use the profile-photo-edit class for styling #}
+                    <img src="{{ url_for('static', filename='profile_photos/' + user.ProfilePhotoFilename) if user.ProfilePhotoFilename else url_for('static', filename='images/default_profile.png') }}"
+                         alt="Current Profile Photo"
+                         class="profile-photo-edit"> {# Apply the specific edit page photo style #}
+                 </div>
+            </div>
+
+
+            <div class="mb-3">
+                <label for="profile_photo" class="form-label">Upload New Profile Photo:</label>
+                <input type="file" name="profile_photo" id="profile_photo" class="form-control" accept="image/png, image/jpeg, image/gif">
+                <div class="form-text">Accepted formats: PNG, JPG, GIF</div> {# Corrected formats #}
+            </div>
+
+            <div class="mb-3">
+                 <label class="form-label">Email:</label>
+                 {# Use form-control-plaintext or just p tag #}
+                 <p class="form-control-static">{{ user.Email }}</p> {# Display email as static text #}
+            </div>
+             <div class="mb-3">
+                 <label class="form-label">Role:</label>
+                 {# Use form-control-plaintext or just p tag #}
+                 <p class="form-control-static">{{ user.Role }}</p> {# Display role as static text #}
+            </div>
+
+
+            <button type="submit" class="btn btn-primary w-100 mt-3">Save Changes</button> {# Added margin-top #}
+             {# Add margin-top to cancel button #}
+            <div class="text-center mt-3"> {# Center the cancel button link #}
+                 <a href="{{ url_for('profile') }}" class="btn btn-secondary">Cancel</a> {# Button to cancel and go back #}
+             </div>
+        </form>
+
+
+    </div>
+</div>
+
+{# Use the same Bootstrap JS version as profile.html #}
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
