@@ -1,7 +1,7 @@
 DB_CONFIG = {
     'host': 'localhost',
     'user': 'root',
-    'password': 'bhavana@123',
+    'password': 'Flydeepthi@1',
     'database': 'EventRegistrationDB'
 }
 
